@@ -1,0 +1,127 @@
+// Developer notes for task 8 "צייר לי שבוע מושלם", the demo situations and a jump list (Shift+D).
+import { html, Icon, cx } from './lib.js';
+import { GENDER, setDemoGender, SCENARIOS } from './data.js';
+
+export const JUMPS = [
+  { id: 'home-before', label: 'דף הבית: לפני הטקס (ראשון בבוקר)' },
+  { id: 'opening', label: 'פתיחה' },
+  { id: 'last', label: '1. מה נעשה מהשבוע שעבר' },
+  { id: 'week', label: '2א. מה כבר קבוע השבוע' },
+  { id: 'followups', label: '2ב. למי לחזור' },
+  { id: 'numbers', label: '3א. המספרים' },
+  { id: 'focus', label: '3ב. הפוקוס של השבוע' },
+  { id: 'meeting', label: '4. מה לשאול בפגישה' },
+  { id: 'tasks', label: '5. שלוש משימות' },
+  { id: 'done', label: 'סיום: השבוע מצויר' },
+  { id: 'home', label: 'דף הבית: "השבוע שלי"' },
+  { id: 'home-wed', label: 'רביעי: בדיקת אמצע שבוע' },
+  { id: 'home-thu', label: 'חמישי: סוגרים את השבוע' },
+  { id: 'next-sunday', label: 'ראשון הבא, אחרי סגירה בחמישי' },
+];
+
+const NOTES = [
+  {
+    title: 'מה זה',
+    items: [
+      'משימה 8 בסקופ (מפת הדרכים, שלב 2 סעיף 11). כפתור בדף הבית לכל המשתמשים, בתחילת השבוע או בכל זמן. לא שלב במסע.',
+      'מבוסס על הסקיל "צייר לי שבוע מושלם" (חבילת הסקילים, עמוד 10): מה נעשה, יומן, פולואפים, תוכן, מספרים, שאלות למלווה, שלוש משימות.',
+      'כל חלק שאין לו נתונים מדלג בשקט: בלי לידים אין פולואפים (לפני שלב 11), בלי יעד אין מספרים ופוקוס (לפני שלב 5), בלי פגישה ביומן אין חלק "לפגישה", בשבוע הראשון אין "מה נעשה".',
+    ],
+  },
+  {
+    title: 'מאיפה כל דבר מגיע',
+    items: [
+      'יומן: Google Calendar, 7 הימים הקרובים, עד 10 אירועים. ההרשאה calendar.events כבר קיימת, אבל היום המערכת רק כותבת (syncTaskToCalendar). צריך פונקציה שקוראת אירועים.',
+      'פגישת FlowBiz מזוהה לפי "FlowBiz" או "ליווי" בכותרת. רק כשיש כזו השבוע, החלק "לפגישה" מופיע.',
+      'פולואפים: טבלת הלידים האחת, פולואפ ב-7 הימים הקרובים, קודם מי שבאיחור. ליד מקבל הודעת תשובה, לקוח פעיל הודעת שימור.',
+      'תוכן: התוכנית השבועית של "מכונת תוכן שיווקי" (שלב 10).',
+      'יעדים ושעות בשבוע: "העסק במספרים" (שלב 5). מספרים: פניות מהלידים, שיחות היכרות מהיומן, סגירות מ"סגרתי!", הכנסות מהמרכז הפיננסי. הוצאות שיווק המשתמש ממלא, ואפשר להשאיר ריק.',
+    ],
+  },
+  {
+    title: 'חישובים (בקוד, לא במודל)',
+    items: [
+      'הפוקוס: השלב הראשון במשפך (פניות → שיחות → לקוחות) שמתחת ל-60% מהיעד השבועי. משם יוצאת המשימה הראשונה. הכול ביעד = "לשמור על הקצב".',
+      'בדיקת עומס: פגישות עסקיות ביומן (בלי אישיות) + זמן המשימות + 30 דק׳ ביום להודעות וניהול, מול השעות לעסק בשבוע. מעל: הצעה לקצר משימה (לכל משימה יש גרסה קצרה) או לעדכן את השעות לשבוע הזה.',
+      'בלוקים ביומן: כל משימה נכנסת לרווח הפנוי הראשון ביום שלה, 09:00-18:00 (שישי עד 13:00), בקפיצות של 15 דק׳ ועם 15 דק׳ מרווח מפגישות. יום מלא מעביר ליום הבא.',
+      'קצב החודש: הכנסות החודש מול יעד ההכנסה, מול כמה מהחודש עבר.',
+    ],
+  },
+  {
+    title: 'מה המודל כותב (רק שני דברים)',
+    items: [
+      'נוסח הודעות הפולואפ, בקול של המשתמש, הלקוח בגוף שלישי. המשתמש יכול לערוך לפני שליחה.',
+      'שלוש המשימות: בדיוק שלוש, קונקרטיות, אחת מהפוקוס. משתמש באמצע המסע מקבל משימות מהשלבים הבאים שלו, לפי השעות שלו. "הצעה אחרת" תמיד משאירה דרך חזרה.',
+      'פרטיות: כותרות אירועים ביומן ושמות לקוחות לא נשלחים למודל. המודל מקבל רק סוג (פגישת ליווי / שיחת היכרות) ושעות. לקוחות של יועצת תזונה הם מידע בריאותי (הסקיל, עמוד 19).',
+    ],
+  },
+  {
+    title: 'מה נשמר',
+    items: [
+      'רשומת שבוע (לפי יום ראשון): מה בוצע מהשבוע הקודם, שורת המספרים (אחת לשבוע), הפוקוס, שלוש המשימות עם יום, שעה ו"בוצע", והשאלות לפגישה. היסטוריה של 26 שבועות.',
+      '"שלחתי" על פולואפ מעדכן את הליד: מגע אחרון היום, פולואפ הבא בעוד 3 ימים (ליד) או 7 ימים (לקוח פעיל). עם ביטול.',
+      'שמירה באישור: המספרים נשמרים כשממשיכים מהמסך, המשימות כש"לצייר את השבוע".',
+    ],
+  },
+  {
+    title: 'במהלך השבוע',
+    items: [
+      'תזכורות במייל ובהתראה (וואטסאפ כשהבוט יעלה): ראשון 08:00 הטקס, רביעי 12:00 אמצע שבוע, חמישי 16:00 סיכום. המשתמש משנה יום ושעה במסך הסיום.',
+      'רביעי: רואים כמה בוצעו, מסמנים, ומזיזים משימה ליום אחר או לשבוע הבא. הבלוק ביומן זז איתה.',
+      'חמישי: מסמנים מה בוצע וממלאים את המספרים. ביום ראשון שאחרי מדלגים על "מה נעשה" ועל המספרים, ומתחילים מהיומן.',
+    ],
+  },
+  {
+    title: 'רצף ו"חסכת עד עכשיו"',
+    items: [
+      'רצף: שבועות ברצף שבהם הטקס הושלם. שבוע בלי טקס מאפס.',
+      'סיום הטקס מוסיף 150 ₪ ל"חסכת עד עכשיו" (כמו שעת תכנון עם יועץ), ושלוש משימות שבוצעו מוסיפות 100 ₪. המטבעות עפים לחסכון כמו בסיום שלב. הסכומים לאישור FlowBiz.',
+    ],
+  },
+];
+
+export function DevPanel({ open, onClose, onJump, onReset, scenario, onScenario }) {
+  return html`<aside
+    class=${cx(
+      'fixed inset-y-0 end-0 z-[70] flex w-full max-w-sm flex-col border-s border-slate-200 bg-white shadow-2xl transition-transform duration-200',
+      open ? 'translate-x-0' : '-translate-x-full pointer-events-none invisible',
+    )}
+    aria-hidden=${!open}
+  >
+    <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <h2 class="flex items-center gap-2 text-[16px] font-bold text-slate-900"><${Icon} name="code-xml" size=${17} /> הערות למפתחים</h2>
+      <button type="button" onClick=${onClose} aria-label="סגירה" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 cursor-pointer"><${Icon} name="x" size=${18} /></button>
+    </div>
+    <div class="thin-scroll flex-1 overflow-y-auto p-4 text-[14px] leading-relaxed text-slate-700">
+      <section class="mb-4 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3">
+        <h3 class="mb-2 font-bold text-brand-900">המצב לדוגמה</h3>
+        <div class="flex flex-col gap-1.5" role="radiogroup" aria-label="המצב לדוגמה">
+          ${Object.entries(SCENARIOS).map(
+            ([id, sc]) => html`<button key=${id} type="button" role="radio" aria-checked=${scenario === id} onClick=${() => onScenario(id)} class=${cx('rounded-lg border px-3 py-1.5 text-start cursor-pointer', scenario === id ? 'border-brand-600 bg-brand-100 text-brand-600' : 'border-brand-200 bg-white text-brand-900')}><b class="block text-[14px]">${sc.label}</b><small class="text-[12px]">${sc.sub}</small></button>`,
+          )}
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="המשתמש לדוגמה">
+          ${[
+            ['f', 'מיכל', 'פנייה בלשון נקבה'],
+            ['m', 'מיכאל', 'פנייה בלשון זכר'],
+          ].map(
+            ([id, name, sub]) => html`<button key=${id} type="button" role="radio" aria-checked=${GENDER === id} onClick=${() => GENDER !== id && setDemoGender(id)} class=${cx('rounded-lg border px-3 py-1.5 text-start cursor-pointer', GENDER === id ? 'border-brand-600 bg-brand-100 text-brand-600' : 'border-brand-200 bg-white text-brand-900')}><b class="block text-[14px]">${name}</b><small class="text-[12px]">${sub}</small></button>`,
+          )}
+        </div>
+        <button type="button" class="mt-2 text-[13px] font-bold text-brand-600 underline underline-offset-2 cursor-pointer" onClick=${onReset}>להתחיל מההתחלה</button>
+      </section>
+      <section class="mb-5 rounded-xl border border-dashed border-brand-300 bg-brand-50/60 p-3">
+        <h3 class="mb-2 font-bold text-brand-900">מעבר מהיר בין המסכים</h3>
+        <div class="flex flex-col gap-1.5">
+          ${JUMPS.map((j) => html`<button key=${j.id} type="button" onClick=${() => onJump(j.id)} class="rounded-lg border border-brand-200 bg-white px-2.5 py-1 text-start text-[13px] font-semibold hover:bg-brand-50 cursor-pointer">${j.label}</button>`)}
+        </div>
+      </section>
+      ${NOTES.map(
+        (n) => html`<section key=${n.title} class="mb-4 p-1">
+          <h3 class="mb-1.5 font-bold text-slate-900">${n.title}</h3>
+          <ul class="list-disc space-y-1 ps-4">${n.items.map((t) => html`<li>${t}</li>`)}</ul>
+        </section>`,
+      )}
+    </div>
+  </aside>`;
+}
