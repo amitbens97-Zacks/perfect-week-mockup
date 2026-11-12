@@ -20,7 +20,6 @@ export const eventsOf = (sc) => (sc.calendar ? [...EVENTS, ...(sc.busy ? BUSY_EV
 export const followupsOf = (sc) => (sc.leads ? FOLLOWUPS : []);
 export const postsOf = (sc) => (sc.content ? POSTS : []);
 export const lastTasksOf = (sc) => (sc.first ? [] : sc.step < 11 ? LAST_TASKS.map((t, i) => ({ ...t, text: ['להשלים את "סל המוצרים" (שלב 3)', 'לכתוב 3 שמות למוצר המרכזי', 'לקרוא את תיק הלקוח'][i], done: i < 2 })) : LAST_TASKS);
-export const meetingOf = (sc) => eventsOf(sc).find((e) => e.kind === 'mentor') || null;
 
 // Hours of business work in the calendar (personal events don't count).
 export const busyMins = (events) => events.filter((e) => e.kind !== 'personal').reduce((t, e) => t + toMin(e.to) - toMin(e.from), 0);
@@ -61,28 +60,26 @@ export function defaultTasks(sc, focus, carry) {
     return JOURNEY_TASKS.slice(0, 3).map((t, i) => ({ ...t, id: `j-${i}`, slot: `j${i}`, alt: 0, day: [0, 2, 4][i] }));
   }
   const first = focus ? { ...FOCUS_TASKS[focus.id] } : { ...FOCUS_TASKS.steady };
-  // Last week's undone task joins the focus task when they are the same job;
-  // otherwise it takes the third place (still exactly three).
+  // Last week's undone task joins the focus task when they are the same job; otherwise it takes
+  // the content slot (the content is already planned in "מכונת תוכן"). The system task stays.
   const same = carry && focus?.id === 'calls';
   if (same) first.carried = true;
-  const third = TASK_POOL.third.findIndex((t) => !t.needsMeeting || sc.meeting);
-  const thirdTask = carry && !same
-    ? { text: carry.text, mins: 30, kind: 'carry', id: 'third-carry', slot: 'third', alt: -1, day: 1 }
-    : { ...pick(TASK_POOL.third[third], 'third', third), day: sc.meeting && third === 0 ? 1 : 3 };
+  const second = carry && !same
+    ? { text: carry.text, steps: carry.steps || [], mins: 30, kind: 'carry', id: 'content-carry', slot: 'content', alt: -1, day: 1 }
+    : { ...pick(TASK_POOL.content[0], 'content'), day: 4 };
   return [
     { ...first, id: 'focus-0', slot: 'focus', alt: Object.keys(FOCUS_TASKS).indexOf(focus?.id || 'steady'), day: 0 },
-    { ...pick(TASK_POOL.content[0], 'content'), day: 4 },
-    thirdTask,
+    second,
+    { ...pick(TASK_POOL.system[0], 'system'), day: 3 },
   ];
 }
 
 // "הצעה אחרת": the next option for that slot (the previous one stays one click back).
-export function nextOption(task, sc) {
+export function nextOption(task) {
   const pool = task.slot === 'focus' ? Object.values(FOCUS_TASKS) : task.slot.startsWith('j') ? JOURNEY_TASKS : TASK_POOL[task.slot];
-  const ok = pool.map((t, i) => [t, i]).filter(([t]) => !t.needsMeeting || sc.meeting);
-  const at = ok.findIndex(([, i]) => i === task.alt);
-  const [t, i] = ok[(at + 1) % ok.length];
-  return { ...t, id: `${task.slot}-${i}`, slot: task.slot, alt: i, day: task.day, prev: task };
+  const at = task.alt;
+  const i = (at + 1) % pool.length;
+  return { ...pool[i], id: `${task.slot}-${i}`, slot: task.slot, alt: i, day: task.day, prev: task };
 }
 
 // ---------- the time blocks ----------

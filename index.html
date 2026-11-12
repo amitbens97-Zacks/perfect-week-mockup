@@ -142,7 +142,9 @@
       .fb-shark:hover .fb-shark-face { transform: scale(1.03); }
       .fb-shark:focus-visible { outline: none; }
       .fb-shark:focus-visible .fb-shark-face { outline: 2px solid #0038b8; outline-offset: 3px; }
-      @media (max-width: 767px) { .fb-shark-face img { width: 56px !important; height: 56px !important; } .fb-shark-label { height: 40px; font-size: 15px; right: 28px; padding: 0 40px 0 18px; } }
+      .fb-shark.on-left .fb-shark-label { right: auto; left: 34px; padding: 0 22px 0 50px; clip-path: inset(0 100% 0 0 round 999px); }
+      .fb-shark.on-left:hover .fb-shark-label, .fb-shark.on-left:focus-visible .fb-shark-label, .fb-shark.on-left.is-open .fb-shark-label, .fb-shark.on-left.is-dragging .fb-shark-label { clip-path: inset(0 0 0 0 round 999px); }
+      @media (max-width: 767px) { .fb-shark-face img { width: 56px !important; height: 56px !important; } .fb-shark-label { height: 40px; font-size: 15px; right: 28px; padding: 0 40px 0 18px; } .fb-shark.on-left .fb-shark-label { right: auto; left: 28px; padding: 0 18px 0 40px; } }
       .lp-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: 14px; border: 1.5px solid #e7e1d5; background: #fff; text-align: start; cursor: pointer; }
       .lp-option:hover { border-color: #8fb3ef; background: #f6f9ff; }
       details > summary::-webkit-details-marker { display: none; }
@@ -185,7 +187,7 @@
       // makes the browser always fetch the current modules.
       (function () {
         var v = Date.now(), imports = {};
-        ['board', 'calc', 'components', 'data', 'devnotes', 'home', 'lib', 'main', 'screens', 'ui', 'viewswitch'].forEach(function (m) {
+        ['board', 'calc', 'components', 'data', 'devnotes', 'home', 'lib', 'main', 'screens', 'steps', 'ui', 'viewswitch'].forEach(function (m) {
           var url = new URL('./src/' + m + '.js', location.href).href;
           imports[url] = url + '?v=' + v;
         });

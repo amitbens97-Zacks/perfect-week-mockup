@@ -3,10 +3,10 @@
 // מה נעשה → השבוע (יומן + תוכן, פולואפים) → המספרים (+ הפוקוס) → לפגישה → 3 משימות → סיום → דף הבית.
 // Around it: the home card, Wednesday's check-in and Thursday's 30-second close.
 // Link params: ?screen=<id>, ?scenario=<id>, ?user=m|f, ?embed = phone layout. Shift+D opens the notes.
-import { html, render, useState, useEffect, useRef, Icon, confetti } from './lib.js';
+import { html, render, useState, useEffect, useRef, Icon, confetti, confettiBurst } from './lib.js';
 import { PartnerBubble, Progress, TopBar, BottomBar, Status, PrimaryButton, Button, Toast } from './components.js';
 import { STEP, USER, SCENARIOS, LAST_NUMS, FOLLOWUPS, VALUE, g } from './data.js';
-import { eventsOf, followupsOf, postsOf, lastTasksOf, meetingOf, focusOf, defaultTasks, nextOption, placeBlocks, loadOf } from './calc.js';
+import { eventsOf, followupsOf, postsOf, lastTasksOf, focusOf, defaultTasks, nextOption, placeBlocks, loadOf } from './calc.js';
 import { Opening, LastWeek, WeekScreen, Followups, Numbers, Focus, Meeting, Tasks, Done } from './screens.js';
 import { Home } from './home.js';
 import { DevPanel } from './devnotes.js';
@@ -44,6 +44,10 @@ function freshState(scId) {
     myQuestions: [],
     prepDoc: true,
     tasks: null,
+    events: null, // null = as read from the calendar; an array once the user edits it
+    posts: null, // the same for the content plan
+    stepsDone: {}, // { taskId: [bool per step] }
+    paidAll: false, // the +100 for all three is paid once a week
     blocks: true,
     reminders: { ritual: { day: 0, at: '08:00' }, wed: { day: 3, at: '12:00' }, thu: { day: 4, at: '16:00' } },
     closed: false,
@@ -77,13 +81,18 @@ function App({ view: shellView, onViewChange }) {
   const sRef = useRef(s);
   sRef.current = s;
 
-  const sc = { ...SCENARIOS[s.scId], calendar: s.connected, meeting: SCENARIOS[s.scId].meeting && s.connected };
+  // The week as read from the calendar and the content plan, or as the user edited it. The
+  // meeting part shows whenever there is a FlowBiz meeting in the (edited) calendar.
+  const scBase = { ...SCENARIOS[s.scId], calendar: s.connected };
+  const events = s.connected ? s.events ?? eventsOf({ ...scBase, meeting: scBase.meeting }) : [];
+  const posts = s.posts ?? postsOf(scBase);
+  const meeting = events.find((e) => e.kind === 'mentor') || null;
+  const sc = { ...scBase, meeting: !!meeting };
   const parts = partsOf(sc, s);
   const FLOW = parts.flatMap((p) => p.screens);
-  const events = eventsOf(sc);
-  const posts = postsOf(sc);
   const fups = followupsOf(sc);
-  const meeting = meetingOf(sc);
+  const setEvents = (fn) => setS((x) => ({ ...x, events: fn(x.events ?? events) }));
+  const setPosts = (fn) => setS((x) => ({ ...x, posts: fn(x.posts ?? posts) }));
   const lastTasks = lastTasksOf(sc);
   const focus = sc.goal ? focusOf(s.closed && s.thuNums ? s.thuNums : s.nums, sc) : null;
 
@@ -132,11 +141,38 @@ function App({ view: shellView, onViewChange }) {
     toast?.undo?.();
     setToast(null);
   };
-  const coins = (amount, text) => {
-    setS((x) => ({ ...x, saved: x.saved + amount }));
-    confetti('step');
-    notify(`${text} +${amount} ₪ ל"חסכת עד עכשיו"`, 'coins');
+  // Small wins: a ticked step = a small burst from the checkbox; a whole task = the full confetti;
+  // all three = the big one, and +100 ₪ to "חסכת עד עכשיו" (once a week).
+  const taskDone = (t, homeDone) => {
+    const x = sRef.current;
+    const all = (x.tasks || []).every((y) => homeDone[y.id]);
+    if (all && !x.paidAll) {
+      setS((y) => ({ ...y, paidAll: true, saved: y.saved + VALUE.allThree }));
+      confetti('chapter');
+      notify(`שלוש משימות, שבוע מלא! +${VALUE.allThree} ₪ ל"חסכת עד עכשיו"`, 'coins');
+    } else {
+      confetti('step');
+      notify(all ? 'שלוש מתוך שלוש. שבוע מלא!' : 'משימה הושלמה! גם ביומן', 'party-popper');
+    }
   };
+  const toggleStep = (t, k, el) => {
+    const x = sRef.current;
+    const steps = t.steps || [];
+    const cur = steps.map((_, j) => !!(x.stepsDone[t.id] || [])[j]);
+    cur[k] = !cur[k];
+    const all = cur.length > 0 && cur.every(Boolean);
+    const homeDone = { ...x.homeDone, [t.id]: all };
+    setS((y) => ({ ...y, stepsDone: { ...y.stepsDone, [t.id]: cur }, homeDone: { ...y.homeDone, [t.id]: all } }));
+    if (cur[k] && all) taskDone(t, homeDone);
+    else if (cur[k]) confettiBurst(el);
+  };
+  const toggleTask = (t, on) => {
+    const x = sRef.current;
+    const homeDone = { ...x.homeDone, [t.id]: on };
+    setS((y) => ({ ...y, homeDone: { ...y.homeDone, [t.id]: on }, stepsDone: { ...y.stepsDone, [t.id]: (t.steps || []).map(() => on) } }));
+    if (on) taskDone(t, homeDone);
+  };
+  const openLink = (t) => notify(`נפתח "${t.link}"`, 'arrow-up-left');
 
   const go = (to) => {
     const i = FLOW.indexOf(to);
@@ -165,7 +201,7 @@ function App({ view: shellView, onViewChange }) {
     notify(`עודכן בלידים: ${f.name}, פולואפ הבא ב-${nextDate}`, 'check', () => setS((x) => ({ ...x, sent: { ...x.sent, [f.id]: undefined } })));
   };
   const unsend = (f) => setS((x) => ({ ...x, sent: { ...x.sent, [f.id]: undefined } }));
-  const swap = (t) => setS((x) => ({ ...x, tasks: x.tasks.map((y) => (y.id === t.id ? nextOption(y, sc) : y)) }));
+  const swap = (t) => setS((x) => ({ ...x, tasks: x.tasks.map((y) => (y.id === t.id ? nextOption(y) : y)) }));
   const unswap = (t) => setS((x) => ({ ...x, tasks: x.tasks.map((y) => (y.id === t.id ? y.prev : y)) }));
 
   function jump(id) {
@@ -174,10 +210,15 @@ function App({ view: shellView, onViewChange }) {
     if (id.startsWith('home') || id === 'next-sunday') {
       if (id === 'home-before') return (setS((x) => ({ ...x, drawn: false })), setScreen('home'));
       if (id === 'next-sunday') {
-        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0 }));
+        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0, homeDone: {}, stepsDone: {}, paidAll: false }));
         return setScreen('opening');
       }
-      setS((x) => ({ ...withTasks(x), drawn: true, homeDone: id === 'home' ? x.homeDone : { ...x.homeDone, [withTasks(x).tasks[0].id]: true } }));
+      setS((x) => {
+        const y = withTasks(x);
+        const t0 = y.tasks[0];
+        if (id === 'home') return { ...y, drawn: true };
+        return { ...y, drawn: true, homeDone: { ...x.homeDone, [t0.id]: true }, stepsDone: { ...x.stepsDone, [t0.id]: (t0.steps || []).map(() => true) } };
+      });
       setMode(id === 'home-wed' ? 'wed' : id === 'home-thu' ? 'thu' : null);
       return setScreen('home');
     }
@@ -216,7 +257,7 @@ function App({ view: shellView, onViewChange }) {
 
   if (screen === 'home')
     return html`<${Home} s=${s} set=${setS} tasks=${placed} items=${items} focus=${shownFocus} drawn=${s.drawn} mode=${mode} setMode=${setMode}
-        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onCoins=${coins} />
+        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} />
       <${Toast} toast=${toast} onUndo=${undoToast} />
       <${DevPanel} open=${dev} onClose=${() => setDev(false)} onJump=${jump} onReset=${reset} scenario=${s.scId} onScenario=${changeScenario} />
       ${devFab(setDev)}`;
@@ -257,15 +298,15 @@ function App({ view: shellView, onViewChange }) {
 
   const common = { s, set: setS, items };
   const body = {
-    opening: html`<${Opening} parts=${parts} sc=${sc} s=${s} items=${items} />`,
+    opening: html`<${Opening} parts=${parts} s=${s} />`,
     last: html`<${LastWeek} ...${common} tasks=${lastTasks} />`,
-    week: html`<${WeekScreen} sc=${sc} events=${events} posts=${posts} meeting=${meeting} items=${items} notify=${notify} connected=${sc.calendar} onConnect=${() => (setS((x) => ({ ...x, connected: true })), notify('Google Calendar חובר. הכריש קרא את השבוע', 'calendar-check'))} />`,
+    week: html`<${WeekScreen} sc=${sc} events=${events} posts=${posts} setEvents=${setEvents} setPosts=${setPosts} items=${items} notify=${notify} connected=${sc.calendar} onConnect=${() => (setS((x) => ({ ...x, connected: true })), notify('Google Calendar חובר. הכריש קרא את השבוע', 'calendar-check'))} />`,
     followups: html`<${Followups} list=${fups} s=${s} onSent=${sent} onUnsend=${unsend} setMsg=${(id, v) => setS((x) => ({ ...x, msgs: { ...x.msgs, [id]: v } }))} notify=${notify} items=${items} />`,
     numbers: html`<${Numbers} ...${common} />`,
     focus: html`<${Focus} s=${s.closed && s.thuNums ? { ...s, nums: s.thuNums } : s} focus=${focus} items=${items} />`,
     meeting: meeting && html`<${Meeting} meeting=${meeting} ...${common} soon=${meeting.day <= 2} />`,
     tasks: s.tasks && html`<${Tasks} ...${common} sc=${sc} tasks=${placed} load=${load} focus=${shownFocus} onSwap=${swap} onBack=${unswap} notify=${notify} />`,
-    done: s.tasks && html`<${Done} s=${s} set=${setS} sc=${sc} tasks=${placed} items=${items} focus=${shownFocus} notify=${notify} setRem=${(k, v) => setS((x) => ({ ...x, reminders: { ...x.reminders, [k]: { ...x.reminders[k], ...v } } }))} />`,
+    done: s.tasks && html`<${Done} s=${s} set=${setS} sc=${sc} tasks=${placed} items=${items} focus=${shownFocus} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} setRem=${(k, v) => setS((x) => ({ ...x, reminders: { ...x.reminders, [k]: { ...x.reminders[k], ...v } } }))} />`,
   }[screen];
 
   return html`<div class="fb-notebook flex h-dvh flex-col text-ink" dir="rtl">

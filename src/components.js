@@ -350,9 +350,11 @@ export function PartnerBubble({ message, unread, onRead, action, mood = 'calm' }
   // Only the round shark shows. On hover (or keyboard focus) a dark tab with the name
   // slides out of it to the left, as in Amit's recording of 8.11.2026.
   const place = pos ? { left: `${pos.l}px`, top: `${pos.t}px` } : { left: '20px', bottom: '20px' };
+  // On the left half of the page the name tab slides out to the right, so it stays on screen.
+  const onLeft = !pos || pos.l < (box()?.clientWidth || 1000) / 2;
   return html`<div
     ref=${el}
-    class=${cx('fb-shark no-print', open && 'is-open', state === 'dragging' && 'is-dragging', state === 'blocked' && 'is-dragging is-blocked')}
+    class=${cx('fb-shark no-print', onLeft && 'on-left', open && 'is-open', state === 'dragging' && 'is-dragging', state === 'blocked' && 'is-dragging is-blocked')}
     style=${place}
     role="button"
     tabindex="0"

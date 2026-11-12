@@ -96,13 +96,23 @@ export function confetti(kind = 'step') {
   try {
     shapes.push(fire.shapeFromPath({ path: 'M0 1.2 C3 -0.6 6 3 9 1.2 C12 -0.6 15 3 18 1.2 L18 3 C15 4.8 12 1.2 9 3 C6 4.8 3 1.2 0 3 Z' }));
   } catch {}
-  fire({ particleCount: kind === 'chapter' ? 200 : 100, spread: 70, origin: { y: 0.55 }, colors, shapes, scalar: 1.15 });
+  fire({ particleCount: kind === 'chapter' ? 200 : 100, spread: 70, origin: { y: 0.55 }, colors, shapes, scalar: 1.15, zIndex: 200 });
   const end = Date.now() + (kind === 'chapter' ? 2000 : 1000);
   (function frame() {
-    fire({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors, shapes, scalar: 1.1 });
-    fire({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors, shapes, scalar: 1.1 });
+    fire({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0, y: 0.7 }, colors, shapes, scalar: 1.1, zIndex: 200 });
+    fire({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1, y: 0.7 }, colors, shapes, scalar: 1.1, zIndex: 200 });
     if (Date.now() < end) requestAnimationFrame(frame);
   })();
+}
+
+// A small win: a little burst of paper from the checkbox that was just ticked (a sub-task).
+export function confettiBurst(el) {
+  const fire = window.confetti;
+  if (!fire || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let origin = { x: 0.5, y: 0.6 };
+  const r = el?.getBoundingClientRect?.();
+  if (r && r.width) origin = { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight };
+  fire({ particleCount: 28, spread: 65, startVelocity: 18, ticks: 70, gravity: 0.9, scalar: 0.7, origin, colors: ['#0038b8', '#8fb3ef', '#2d3e66', '#dde9fc'], shapes: ['square', 'circle'], zIndex: 200 });
 }
 
 const nf = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 0 });

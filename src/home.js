@@ -1,6 +1,7 @@
 // The home page around the ritual: the "צייר לי שבוע מושלם" button, the "השבוע שלי" card after it,
 // the Wednesday check-in, the Thursday 30-second close, and the past weeks.
-import { html, useState, Icon, cx, PencilCheck } from './lib.js';
+import { html, useState, Icon, cx } from './lib.js';
+import { Check, TaskRow } from './steps.js';
 import { Button, Logo, SharkAvatar } from './components.js';
 import { Sheet, inputCls } from './ui.js';
 import { DayList } from './board.js';
@@ -9,14 +10,10 @@ import { fmt, num } from './calc.js';
 
 const NAV = ['בית', 'יומן', 'משימות', 'כספים', 'קבצים', 'לידים'];
 
-function Check({ on, onClick, label, size = 'md' }) {
-  return html`<button type="button" role="checkbox" aria-checked=${on} aria-label=${label} onClick=${onClick} class=${cx('grid shrink-0 place-items-center rounded-lg border-[1.5px] transition-colors cursor-pointer', size === 'sm' ? 'h-7 w-7' : 'h-8 w-8', on ? 'border-brand-600 bg-brand-100' : 'border-line bg-white hover:border-brand-300')}>
-    ${on && html`<${PencilCheck} size=${18} color="#0038b8" weight=${3} />`}
-  </button>`;
-}
-
 // The week card on the home page.
-function WeekCard({ s, tasks, focus, drawn, onDraw, onToggle, onHistory, onBoard }) {
+function WeekCard({ s, tasks, focus, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard }) {
+  // One task open at a time: the one the user picked, else the first one not done yet.
+  const [pick, setPick] = useState(null);
   if (!drawn)
     return html`<section class="paper rounded-[18px] p-5">
       <div class="mb-3 flex items-center gap-3">
@@ -28,21 +25,20 @@ function WeekCard({ s, tasks, focus, drawn, onDraw, onToggle, onHistory, onBoard
       <button type="button" onClick=${onHistory} class="mt-2 block w-full text-center text-[14px] font-bold text-brand-600 hover:underline cursor-pointer">השבועות הקודמים</button>
     </section>`;
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
+  const open = pick === 'none' ? null : pick || tasks.find((t) => !s.homeDone[t.id])?.id;
+  const stepsAll = tasks.reduce((n, t) => n + (t.steps || []).length, 0);
+  const stepsOn = tasks.reduce((n, t) => n + (s.stepsDone[t.id] || []).filter(Boolean).length, 0);
   return html`<section class="paper rounded-[18px] p-5">
     <div class="mb-1 flex items-center justify-between gap-2">
       <b class="font-display text-[19px]">השבוע שלי</b>
       <span class="inline-flex items-center gap-1 text-[14px] font-bold"><${Icon} name="flame" size=${16} class="text-warn" />${s.streak}</span>
     </div>
     ${focus && html`<p class="mb-2 flex items-center gap-1.5 text-[14px] font-bold text-brand-700"><${Icon} name="crosshair" size=${14} />הפוקוס: ${focus.title}</p>`}
-    <div class="mb-2 h-2 overflow-hidden rounded-full bg-canvas ring-1 ring-line"><span class="block h-full rounded-full bg-brand-600 transition-all" style=${{ width: `${(done / 3) * 100}%` }}></span></div>
+    <div class="mb-1 h-2 overflow-hidden rounded-full bg-canvas ring-1 ring-line"><span class="block h-full rounded-full bg-brand-600 transition-all" style=${{ width: `${stepsAll ? (stepsOn / stepsAll) * 100 : 0}%` }}></span></div>
+    <p class="mb-1 text-[13px] text-muted">${stepsOn} מתוך ${stepsAll} צעדים · ${done} מתוך 3 משימות${done === 3 ? '. שבוע מלא!' : ''}</p>
     <div class="flex flex-col">
-      ${tasks.map((t) => html`<div key=${t.id} class="flex items-center gap-2.5 border-b border-line py-2 last:border-0">
-        <${Check} on=${!!s.homeDone[t.id]} label=${t.text} onClick=${() => onToggle(t)} size="sm" />
-        <span class=${cx('min-w-0 flex-1 text-[15px] font-semibold leading-snug', s.homeDone[t.id] && 'text-muted line-through decoration-brand-300')}>${t.text}</span>
-        <span class="whitespace-nowrap text-[12px] tabular-nums text-muted">${DAYS[t.day].short} ${t.at || ''}</span>
-      </div>`)}
+      ${tasks.map((t) => html`<${TaskRow} key=${t.id} t=${t} sd=${s.stepsDone[t.id]} done=${!!s.homeDone[t.id]} open=${open === t.id} onOpen=${() => setPick(open === t.id ? 'none' : t.id)} onStep=${onStep} onTask=${onTask} onLink=${onLink} meta=${`${DAYS[t.day].short} ${t.at || ''}`} />`)}
     </div>
-    <p class="mt-2 text-[14px] font-bold">${done} מתוך 3 בוצעו${done === 3 ? '. שבוע מלא!' : ''}</p>
     <div class="mt-2 flex items-center justify-between gap-2 text-[14px] font-bold text-brand-600">
       <button type="button" onClick=${onBoard} class="hover:underline cursor-pointer">ללוח של השבוע</button>
       <button type="button" onClick=${onDraw} class="hover:underline cursor-pointer">לעדכן את השבוע</button>
@@ -60,16 +56,9 @@ function Notice({ icon, title, text, action, onClick }) {
   </button>`;
 }
 
-export function Home({ s, set, tasks, items, focus, drawn, mode, setMode, onDraw, notify, onCoins }) {
+export function Home({ s, set, tasks, items, focus, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
   const [board, setBoard] = useState(false);
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
-  const toggle = (t) => {
-    const on = !s.homeDone[t.id];
-    const next = { ...s.homeDone, [t.id]: on };
-    set((x) => ({ ...x, homeDone: next }));
-    if (on && tasks.every((x) => next[x.id])) onCoins(VALUE.allThree, 'שלוש משימות, שבוע מלא!');
-    else if (on) notify('סומן. גם ביומן', 'check');
-  };
   return html`<div class="fb-notebook flex h-dvh flex-col text-ink" dir="rtl">
     <header class="z-20 shrink-0 border-b border-line bg-surface">
       <div class="flex h-16 items-center gap-4 px-3 md:px-7">
@@ -90,19 +79,19 @@ export function Home({ s, set, tasks, items, focus, drawn, mode, setMode, onDraw
             <b class="block font-display text-[18px] text-ink">המפה של המסע</b>
             <span class="text-[14px]">כמו בדשבורד. כאן המוק-אפ מראה רק את כרטיס השבוע.</span>
           </section>
-          <${WeekCard} s=${s} tasks=${tasks} focus=${focus} drawn=${drawn} onDraw=${onDraw} onToggle=${toggle} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
+          <${WeekCard} s=${s} tasks=${tasks} focus=${focus} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
         </div>
       </div>
     </main>
     ${board && html`<${Sheet} title=${`השבוע · ${WEEK_LABEL}`} onClose=${() => setBoard(false)}><${DayList} items=${items} focus=${focus} /><//>`}
-    ${mode === 'wed-open' && html`<${WedSheet} s=${s} set=${set} tasks=${tasks} onClose=${() => setMode('wed')} notify=${notify} />`}
-    ${mode === 'thu-open' && html`<${ThuSheet} s=${s} set=${set} tasks=${tasks} onClose=${() => setMode('thu')} notify=${notify} />`}
+    ${mode === 'wed-open' && html`<${WedSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('wed')} notify=${notify} />`}
+    ${mode === 'thu-open' && html`<${ThuSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('thu')} notify=${notify} />`}
     ${mode === 'history' && html`<${HistorySheet} onClose=${() => setMode(null)} />`}
   </div>`;
 }
 
 // Wednesday: one look, mark what's done, move what's not to another day.
-function WedSheet({ s, set, tasks, onClose, notify }) {
+function WedSheet({ s, set, tasks, onTask, onClose, notify }) {
   const setDay = (id, day) => set((x) => ({ ...x, tasks: x.tasks.map((t) => (t.id === id ? { ...t, day } : t)) }));
   return html`<${Sheet} title="אמצע השבוע" onClose=${onClose} footer=${html`<span class="text-[14px] text-muted">הבלוקים ביומן זזים איתן</span><${Button} onClick=${() => (onClose(), notify('השבוע עודכן', 'check'))}>לשמור<//>`}>
     <p class="mb-3 text-[15px] text-muted">מה בוצע? ומה שעוד לא, לאיזה יום הוא עובר?</p>
@@ -110,7 +99,7 @@ function WedSheet({ s, set, tasks, onClose, notify }) {
       const on = !!s.homeDone[t.id];
       return html`<div key=${t.id} class="fb-panel mb-2 !p-3">
         <div class="flex items-center gap-2.5">
-          <${Check} on=${on} label=${t.text} onClick=${() => set((x) => ({ ...x, homeDone: { ...x.homeDone, [t.id]: !on } }))} size="sm" />
+          <${Check} on=${on} label=${t.text} onClick=${() => onTask(t, !on)} size="sm" />
           <span class=${cx('min-w-0 flex-1 text-[15px] font-semibold', on && 'text-muted line-through')}>${t.text}</span>
         </div>
         ${!on &&
@@ -125,7 +114,7 @@ function WedSheet({ s, set, tasks, onClose, notify }) {
 }
 
 // Thursday: close the week in 30 seconds. Sunday then starts straight from the planning.
-function ThuSheet({ s, set, tasks, onClose, notify }) {
+function ThuSheet({ s, set, tasks, onTask, onClose, notify }) {
   const [n, setN] = useState({ leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' });
   const close = () => {
     set((x) => ({ ...x, closed: true, thuNums: n }));
@@ -137,7 +126,7 @@ function ThuSheet({ s, set, tasks, onClose, notify }) {
     ${tasks.map((t) => {
       const on = !!s.homeDone[t.id];
       return html`<div key=${t.id} class="flex items-center gap-2.5 border-b border-line py-2 last:border-0">
-        <${Check} on=${on} label=${t.text} onClick=${() => set((x) => ({ ...x, homeDone: { ...x.homeDone, [t.id]: !on } }))} size="sm" />
+        <${Check} on=${on} label=${t.text} onClick=${() => onTask(t, !on)} size="sm" />
         <span class="min-w-0 flex-1 text-[15px] font-semibold">${t.text}</span>
       </div>`;
     })}

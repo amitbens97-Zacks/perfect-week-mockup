@@ -151,7 +151,7 @@ export const POSTS = [
 export const LAST_TASKS = [
   { id: 't1', text: 'לשלוח לגלית פרץ הצעה לליווי 3 חודשים', done: true },
   { id: 't2', text: 'לצלם רילס להרשמה לסדנה', done: true },
-  { id: 't3', text: 'להתקשר ל-4 הפניות מהסדנה ולקבוע שיחות היכרות', done: false },
+  { id: 't3', text: 'להתקשר ל-4 הפניות מהסדנה ולקבוע שיחות היכרות', done: false, steps: ['לפתוח את 4 הפניות בטבלת הלידים', 'להתקשר לשתי הראשונות', 'להתקשר לשתיים הנותרות', 'לקבוע שיחות ביומן'] },
 ];
 
 // Open decisions for the FlowBiz meeting (the skill: up to 12, the newest first).
@@ -163,39 +163,53 @@ export const DECISIONS = [
   { id: 'q5', text: 'איך עונים ל"אין לי זמן לבשל"?', from: 'מ"חדר התרגול"' },
 ];
 
-// The three tasks. Every slot has a few options; "הצעה אחרת" moves to the next one (with a way back).
-// mins = how long it takes; short = a shorter version for a full week.
+// The three tasks: one from the focus, one for content, one that moves the user forward in the
+// system (the next step of the journey, or a tool not used yet). Every slot has a few options;
+// "הצעה אחרת" moves to the next one (with a way back). mins = how long it takes; short = a shorter
+// version for a full week; steps = small sub-tasks to tick off during the week (each a small win).
 export const FOCUS_TASKS = {
-  leads: { text: 'לפרסם את הפוסט של יום ראשון ב-2 קבוצות פייסבוק', mins: 30, kind: 'focus' },
-  calls: { text: 'להתקשר ל-4 הפניות מהסדנה ולקבוע 2 שיחות היכרות', mins: 60, kind: 'focus', short: { text: 'לשלוח ל-4 הפניות מהסדנה הודעה עם קישור לקביעת שיחה', mins: 20 } },
-  closes: { text: 'פולואפ טלפוני לגלית פרץ על ההצעה', mins: 20, kind: 'focus' },
-  steady: { text: 'לבקש מאורית ברק המלצה כתובה לדף הנחיתה', mins: 15, kind: 'focus' },
+  leads: { text: 'לפרסם את הפוסט של יום ראשון ב-2 קבוצות פייסבוק', mins: 30, kind: 'focus', steps: ['לבחור 2 קבוצות שהקהל שלך נמצא בהן', 'להתאים את הפתיח לכל קבוצה', 'לפרסם ולענות לתגובות הראשונות'] },
+  calls: {
+    text: 'להתקשר ל-4 הפניות מהסדנה ולקבוע 2 שיחות היכרות', mins: 60, kind: 'focus',
+    steps: ['לפתוח את 4 הפניות בטבלת הלידים', 'להתקשר לשתי הראשונות', 'להתקשר לשתיים הנותרות', 'לקבוע 2 שיחות ביומן'],
+    short: { text: 'לשלוח ל-4 הפניות מהסדנה הודעה עם קישור לקביעת שיחה', mins: 20, steps: ['להעתיק את ההודעה עם הקישור', 'לשלוח ל-4 הפניות'] },
+  },
+  closes: { text: 'פולואפ טלפוני לגלית פרץ על ההצעה', mins: 20, kind: 'focus', steps: ['לקרוא שוב את ההצעה ששלחת', 'להכין תשובה ל"צריך לחשוב על זה"', 'להתקשר לגלית'] },
+  steady: { text: 'לבקש מאורית ברק המלצה כתובה לדף הנחיתה', mins: 15, kind: 'focus', steps: ['לשלוח לאורית את הבקשה', 'להעלות את ההמלצה לדף הנחיתה'] },
 };
 export const TASK_POOL = {
   content: [
-    { text: 'לצלם את הרילס של יום חמישי (סיפור של לקוחה)', mins: 45, kind: 'content', short: { text: 'לצלם את הרילס בטייק אחד, בלי עריכה', mins: 20 } },
-    { text: 'לכתוב פוסט תשובה ל"אין לי זמן לבשל"', mins: 30, kind: 'content' },
+    {
+      text: 'לצלם את הרילס של יום חמישי (סיפור של לקוחה)', mins: 45, kind: 'content',
+      steps: ['לכתוב 3 משפטים לסיפור', 'לצלם בטייק אחד', 'לתזמן לחמישי ב-19:30'],
+      short: { text: 'לצלם את הרילס בטייק אחד, בלי עריכה', mins: 20, steps: ['לצלם בטייק אחד', 'לתזמן לחמישי ב-19:30'] },
+    },
+    { text: 'לכתוב פוסט תשובה ל"אין לי זמן לבשל"', mins: 30, kind: 'content', steps: ['לרשום 3 ארוחות של 10 דקות', 'לכתוב את הפוסט', 'לתזמן ב"מכונת תוכן"'] },
+    { text: 'לפתוח הרשמה לסדנה של דצמבר בדף הנחיתה', mins: 30, kind: 'content', steps: ['לקבוע תאריך לסדנה', 'לעדכן את דף הנחיתה', 'לפרסם סטורי עם הקישור'] },
   ],
-  third: [
-    { text: 'להכין 3 שאלות לפגישת המיקוד ביום שלישי', mins: 20, kind: 'mentor', needsMeeting: true },
-    { text: 'לפתוח הרשמה לסדנה של דצמבר בדף הנחיתה', mins: 30, kind: 'number' },
-    { text: 'לכתוב תשובה מוכנה להתנגדות "זה יקר לי"', mins: 25, kind: 'sales' },
+  // Progress in the system: the next step of the journey, or a tool that wasn't used yet.
+  system: [
+    {
+      text: 'להתקדם במסע: שיחת אימון אחת ב"חדר התרגול" (שלב 12)', mins: 25, kind: 'system', link: 'חדר התרגול',
+      steps: ['לפתוח את "חדר התרגול"', 'שיחת אימון מול לקוח שאומר "זה יקר לי"', 'לשמור את התשובה בדף ההתנגדויות'],
+      short: { text: 'שיחת אימון קצרה אחת ב"חדר התרגול"', mins: 10, steps: ['לפתוח את "חדר התרגול"', 'שיחה אחת, רמה 1'] },
+    },
+    { text: 'לבנות ב"מכונת תוכן" את התוכנית לשבוע הבא', mins: 20, kind: 'system', link: 'מכונת תוכן', steps: ['לפתוח את "מכונת תוכן"', 'לבחור 3 רעיונות', 'לאשר את התוכנית'] },
+    { text: 'לעדכן את "העסק במספרים" עם מחיר הליווי החדש', mins: 15, kind: 'system', link: 'העסק במספרים', steps: ['לפתוח את "העסק במספרים"', 'לעדכן את המחיר', 'לבדוק את היעד החדש'] },
   ],
 };
 // A user in the middle of the journey (step 4) gets the tasks of the next steps, sized to their hours.
 export const JOURNEY_TASKS = [
-  { text: 'לסיים את "צייד הלקוחות" (שלב 4)', mins: 40, kind: 'journey' },
-  { text: 'לכתוב 5 שמות של אנשים שמתאימים ללקוח האידיאלי', mins: 15, kind: 'journey' },
-  { text: 'להתחיל את "העסק במספרים" (שלב 5)', mins: 35, kind: 'journey' },
-  { text: 'לקרוא את תיק הלקוח ולסמן מה מפתיע', mins: 15, kind: 'journey' },
+  { text: 'לסיים את "צייד הלקוחות" (שלב 4)', mins: 40, kind: 'journey', link: 'צייד הלקוחות', steps: ['לפתוח את השלב מהמפה', 'לענות על החלק שנשאר', 'לאשר את התוצר'] },
+  { text: 'לכתוב 5 שמות של אנשים שמתאימים ללקוח האידיאלי', mins: 15, kind: 'journey', steps: ['לעבור על אנשי הקשר בטלפון', 'לרשום 5 שמות', 'לסמן מי הכי מתאים'] },
+  { text: 'להתחיל את "העסק במספרים" (שלב 5)', mins: 35, kind: 'journey', link: 'העסק במספרים', steps: ['לפתוח את השלב', 'למלא את ההוצאות הקבועות', 'לקבוע יעד הכנסה'] },
+  { text: 'לקרוא את תיק הלקוח ולסמן מה מפתיע', mins: 15, kind: 'journey', steps: ['לקרוא את תיק הלקוח', 'לסמן 2 דברים שמפתיעים'] },
 ];
 
 export const KIND = {
   focus: { label: 'מהפוקוס', icon: 'crosshair' },
   content: { label: 'תוכן', icon: 'megaphone' },
-  mentor: { label: 'לפגישה', icon: 'messages-square' },
-  number: { label: 'מכירות', icon: 'trending-up' },
-  sales: { label: 'מכירות', icon: 'handshake' },
+  system: { label: 'התקדמות במערכת', icon: 'route' },
   journey: { label: 'במסע', icon: 'map' },
   carry: { label: 'מהשבוע שעבר', icon: 'undo-2' },
 };
