@@ -438,7 +438,7 @@ export function Meeting({ meeting, s, set, items, soon }) {
     </div>
     ${soon &&
     html`<div class="fb-panel !p-4">
-      <${Switch} on=${s.prepDoc} onChange=${(v) => set((x) => ({ ...x, prepDoc: v }))} label="להכין את המסמך לפגישה" sub="הפגישה בעוד יומיים. המסמך נבנה מהשבוע: מה נעשה, המספרים מול היעד, איפה נתקע והשאלות" />
+      <${Switch} on=${s.prepDoc} onChange=${(v) => set((x) => ({ ...x, prepDoc: v }))} label="להכין את המסמך לפגישה" sub="הפגישה בעוד יומיים. המסמך נבנה מהשבוע: מה נעשה, המספרים מול היעד, באילו כלים השתמשת, איפה נתקע והשאלות" />
     </div>`}
     <p class="mt-3 text-[14px] text-muted">${picked} ${picked === 1 ? 'שאלה נבחרה' : 'שאלות נבחרו'}. החלטה שמשנה משהו בעסק תעודכן אחרי הפגישה, באישור.</p>
   <//>`;

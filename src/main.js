@@ -3,8 +3,10 @@
 // מה נעשה → השבוע (יומן + תוכן, פולואפים) → המספרים (+ הפוקוס) → לפגישה → 3 משימות → סיום → דף הבית.
 // Around it: the home card, Wednesday's check-in and Thursday's 30-second close.
 // Link params: ?screen=<id>, ?scenario=<id>, ?user=m|f, ?embed = phone layout. Shift+D opens the notes.
+// "הסבר מהכריש": a "?" in the top bar on every screen opens the shark's note, an explanation and a chat (src/explain.js).
 import { html, render, useState, useEffect, useRef, Icon, confetti, confettiBurst } from './lib.js';
 import { PartnerBubble, Progress, TopBar, BottomBar, Status, PrimaryButton, Button, Toast } from './components.js';
+import { EXPLAIN, ExplainButton, SharkTalk } from './explain.js';
 import { STEP, USER, SCENARIOS, LAST_NUMS, FOLLOWUPS, VALUE, g } from './data.js';
 import { eventsOf, followupsOf, postsOf, lastTasksOf, focusOf, defaultTasks, nextOption, placeBlocks, loadOf } from './calc.js';
 import { Opening, LastWeek, WeekScreen, Followups, Numbers, Focus, Meeting, Tasks, Done } from './screens.js';
@@ -16,11 +18,11 @@ const params = new URLSearchParams(location.search);
 const LABEL = { last: 'מה נעשה', week: 'מה קבוע', followups: 'למי לחזור', numbers: 'המספרים', focus: 'הפוקוס', meeting: 'הפגישה', tasks: 'שלוש משימות' };
 const SHARK_LINE = {
   opening: 'שבוע טוב לא קורה במקרה. מציירים אותו ביום ראשון, בעשר דקות.',
-  last: 'מה שלא נעשה זה לא כישלון. זה מידע על מה באמת חשוב.',
+  last: 'מה שלא נעשה לא נעלם. הוא נכנס השבוע רק אם הוא עדיין הכי חשוב.',
   week: 'קודם רואים מה כבר תפוס. רק אז מחליטים מה להוסיף.',
-  followups: 'רוב העסקאות נסגרות בפולואפ השני או השלישי. רוב האנשים מוותרים אחרי הראשון.',
+  followups: 'ליד שלא חוזרים אליו מתקרר. רוב הכסף נמצא בפולואפ, לא בפנייה הראשונה.',
   numbers: 'מספר אחד אמיתי שווה יותר מעשר תחושות.',
-  focus: 'כשמתקנים את המקום שבו המשפך נתקע, כל השאר זז איתו.',
+  focus: 'מתקנים צוואר בקבוק אחד בכל פעם. כל עוד הוא תקוע, מה שמוסיפים לפניו נתקע שם.',
   meeting: 'מי שמגיע לפגישה עם שאלות, יוצא ממנה עם החלטות.',
   tasks: 'שלוש משימות שבוצעו שוות יותר מעשר שחיכו.',
   done: g('זהו, השבוע מצויר. עכשיו רק לצאת לדרך.', 'זהו, השבוע מצויר. עכשיו רק לצאת לדרך.'),
@@ -77,6 +79,14 @@ function App({ view: shellView, onViewChange }) {
   const [toast, setToast] = useState(null);
   const [dev, setDev] = useState(false);
   const [unread, setUnread] = useState(true);
+  const [explain, setExplain] = useState({ screen: null, n: 0 }); // "הסבר מהכריש" opens the shark's note on this screen
+  const screenRef = useRef(null);
+  screenRef.current = screen;
+  useEffect(() => {
+    const open = () => setExplain((x) => ({ screen: screenRef.current, n: x.n + 1 }));
+    window.addEventListener('fb:explain', open);
+    return () => window.removeEventListener('fb:explain', open);
+  }, []);
   const timers = useRef({});
   const sRef = useRef(s);
   sRef.current = s;
@@ -196,7 +206,7 @@ function App({ view: shellView, onViewChange }) {
 
   // "שלחתי": the lead row is updated (last contact today, next follow-up set), with undo.
   const sent = (f) => {
-    const nextDate = f.kind === 'client' ? '25.11' : '18.11';
+    const nextDate = f.kind === 'client' ? '22.11' : '18.11';
     setS((x) => ({ ...x, sent: { ...x.sent, [f.id]: nextDate } }));
     notify(`עודכן בלידים: ${f.name}, פולואפ הבא ב-${nextDate}`, 'check', () => setS((x) => ({ ...x, sent: { ...x.sent, [f.id]: undefined } })));
   };
@@ -277,7 +287,7 @@ function App({ view: shellView, onViewChange }) {
   const top = html`<${TopBar}
     step=${STEP}
     progress=${progress}
-    tools=${html`${!EMBED && html`<${ViewToggle} view=${shellView} onChange=${onViewChange} class="max-md:hidden" />`}${devBtn}`}
+    tools=${html`${!EMBED && html`<${ViewToggle} view=${shellView} onChange=${onViewChange} class="max-md:hidden" />`}${devBtn}${EXPLAIN[screen] && html`<${ExplainButton} />`}`}
     onHome=${() => (setMode(null), setScreen('home'))}
   />`;
 
@@ -313,7 +323,7 @@ function App({ view: shellView, onViewChange }) {
     ${top}
     <main class="thin-scroll relative min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
       ${body}
-      ${SHARK_LINE[screen] && html`<${PartnerBubble} key=${screen} message=${SHARK_LINE[screen]} unread=${unread} onRead=${() => setUnread(false)} />`}
+      ${SHARK_LINE[screen] && html`<${PartnerBubble} key=${screen} message=${SHARK_LINE[screen]} unread=${unread} onRead=${() => setUnread(false)} openKey=${explain.screen === screen ? explain.n : 0} body=${explain.screen === screen && EXPLAIN[screen] && html`<${SharkTalk} key=${explain.n} screen=${screen} />`} onClose=${() => setExplain((x) => ({ ...x, screen: null }))} />`}
     </main>
     ${bottom}
     <${Toast} toast=${toast} onUndo=${undoToast} />

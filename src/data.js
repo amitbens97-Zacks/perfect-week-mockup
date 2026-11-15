@@ -88,7 +88,7 @@ export const WORK = { start: 9 * 60, end: 18 * 60, fridayEnd: 13 * 60 };
 
 // Calendar events (Google Calendar). kind: client (a session), sales (a discovery call),
 // group (the workshop), mentor (a FlowBiz meeting: opens the questions part), personal.
-// A FlowBiz meeting is found by "FlowBiz" or "ליווי FlowBiz" in the title, as the skill says.
+// A FlowBiz meeting is found by "FlowBiz" or the mentor's name in the title (the skill, p.10).
 export const EVENTS = [
   { id: 'e1', day: 0, from: '10:00', to: '11:00', title: 'פגישת ליווי · שירה ל.', kind: 'client' },
   { id: 'e2', day: 0, from: '17:00', to: '18:00', title: 'פגישת ליווי · אורית ב.', kind: 'client' },
@@ -144,7 +144,7 @@ export const FOLLOWUPS = [
 export const POSTS = [
   { id: 'p1', day: 0, at: '19:00', title: 'פוסט: "3 סיבות שהדיאטה נגמרת ביום חמישי"', short: 'פוסט: למה הדיאטה נגמרת', type: 'ערך', state: 'מתוזמן' },
   { id: 'p2', day: 2, at: '12:00', title: g('קרוסלה: "מה אני אוכל ביום עמוס"', 'קרוסלה: "מה אני אוכלת ביום עמוס"'), short: 'קרוסלה: יום עמוס', type: 'ערך', state: 'מתוזמן' },
-  { id: 'p3', day: 4, at: '19:30', title: 'רילס: סיפור של לקוחה, מינוס 6 ק"ג בלי לספור', short: 'רילס: סיפור לקוחה', type: 'הצעה', state: 'לצלם ולהעלות' },
+  { id: 'p3', day: 4, at: '19:30', title: 'רילס: 3 החלפות קטנות בארוחת ערב, ובסוף הזמנה לשיחת היכרות', short: 'רילס: ארוחת ערב', type: 'הצעה', state: 'לצלם ולהעלות' },
 ];
 
 // Last week's three tasks (saved by last week's ritual). Wednesday's check-in already marked two.
@@ -154,7 +154,7 @@ export const LAST_TASKS = [
   { id: 't3', text: 'להתקשר ל-4 הפניות מהסדנה ולקבוע שיחות היכרות', done: false, steps: ['לפתוח את 4 הפניות בטבלת הלידים', 'להתקשר לשתי הראשונות', 'להתקשר לשתיים הנותרות', 'לקבוע שיחות ביומן'] },
 ];
 
-// Open decisions for the FlowBiz meeting (the skill: up to 12, the newest first).
+// Open decisions for the FlowBiz meeting (the skill, p.10: up to 12, the oldest first).
 export const DECISIONS = [
   { id: 'q1', text: 'להעלות את מחיר הליווי ל-3,000 ₪?', from: 'מ"העסק במספרים"' },
   { id: 'q2', text: 'לפתוח סדנה קבוצתית שנייה בדצמבר?', from: 'מסיכום הפגישה הקודמת' },
@@ -175,13 +175,13 @@ export const FOCUS_TASKS = {
     short: { text: 'לשלוח ל-4 הפניות מהסדנה הודעה עם קישור לקביעת שיחה', mins: 20, steps: ['להעתיק את ההודעה עם הקישור', 'לשלוח ל-4 הפניות'] },
   },
   closes: { text: 'פולואפ טלפוני לגלית פרץ על ההצעה', mins: 20, kind: 'focus', steps: ['לקרוא שוב את ההצעה ששלחת', 'להכין תשובה ל"צריך לחשוב על זה"', 'להתקשר לגלית'] },
-  steady: { text: 'לבקש מאורית ברק המלצה כתובה לדף הנחיתה', mins: 15, kind: 'focus', steps: ['לשלוח לאורית את הבקשה', 'להעלות את ההמלצה לדף הנחיתה'] },
+  steady: { text: 'להציע חודש המשך ללקוחות שמסיימות ליווי החודש', mins: 20, kind: 'focus', steps: ['לבדוק מי מסיימת ליווי החודש', 'לשלוח לכל אחת הודעה אישית', 'לקבוע שיחה קצרה עם מי שעונה'] },
 };
 export const TASK_POOL = {
   content: [
     {
-      text: 'לצלם את הרילס של יום חמישי (סיפור של לקוחה)', mins: 45, kind: 'content',
-      steps: ['לכתוב 3 משפטים לסיפור', 'לצלם בטייק אחד', 'לתזמן לחמישי ב-19:30'],
+      text: 'לצלם את הרילס של יום חמישי (3 החלפות בארוחת ערב)', mins: 45, kind: 'content',
+      steps: ['לכתוב את 3 ההחלפות ואת ההזמנה בסוף', 'לצלם בטייק אחד', 'לתזמן לחמישי ב-19:30'],
       short: { text: 'לצלם את הרילס בטייק אחד, בלי עריכה', mins: 20, steps: ['לצלם בטייק אחד', 'לתזמן לחמישי ב-19:30'] },
     },
     { text: 'לכתוב פוסט תשובה ל"אין לי זמן לבשל"', mins: 30, kind: 'content', steps: ['לרשום 3 ארוחות של 10 דקות', 'לכתוב את הפוסט', 'לתזמן ב"מכונת תוכן"'] },
