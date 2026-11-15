@@ -85,16 +85,35 @@ export function PencilLine({ color = '#2f5fc4', class: cls = '' }) {
   </svg>`;
 }
 
+// The confetti draws on its own canvas, on the main thread (not the library's worker), and the
+// canvas is wiped 5 seconds after the last burst. Before this, a burst that started right before
+// a screen change could stay frozen on the home page.
+let inst = null;
+let wipe = null;
+function fireFn() {
+  if (!window.confetti) return null;
+  if (!inst) {
+    const c = document.createElement('canvas');
+    c.setAttribute('aria-hidden', 'true');
+    Object.assign(c.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '200' });
+    document.body.appendChild(c);
+    inst = window.confetti.create(c, { resize: true, useWorker: false });
+  }
+  clearTimeout(wipe);
+  wipe = setTimeout(() => inst.reset(), 5000);
+  return inst;
+}
+
 // Notebook confetti in the brand colors (paper scraps, punched holes, pencil squiggles).
 // Step finish: one burst and a 1s trickle (confetti-step). Chapter finish adds gold, 2s.
 export function confetti(kind = 'step') {
-  const fire = window.confetti;
-  if (!fire || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!window.confetti || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const fire = fireFn();
   const brand = ['#2d3e66', '#0038b8', '#8fb3ef', '#ffffff', '#dde9fc'];
   const colors = kind === 'chapter' ? [...brand, '#e8b44a', '#f2cf7a'] : brand;
   const shapes = ['square', 'circle'];
   try {
-    shapes.push(fire.shapeFromPath({ path: 'M0 1.2 C3 -0.6 6 3 9 1.2 C12 -0.6 15 3 18 1.2 L18 3 C15 4.8 12 1.2 9 3 C6 4.8 3 1.2 0 3 Z' }));
+    shapes.push(window.confetti.shapeFromPath({ path: 'M0 1.2 C3 -0.6 6 3 9 1.2 C12 -0.6 15 3 18 1.2 L18 3 C15 4.8 12 1.2 9 3 C6 4.8 3 1.2 0 3 Z' }));
   } catch {}
   fire({ particleCount: kind === 'chapter' ? 200 : 100, spread: 70, origin: { y: 0.55 }, colors, shapes, scalar: 1.15, zIndex: 200 });
   const end = Date.now() + (kind === 'chapter' ? 2000 : 1000);
@@ -107,8 +126,8 @@ export function confetti(kind = 'step') {
 
 // A small win: a little burst of paper from the checkbox that was just ticked (a sub-task).
 export function confettiBurst(el) {
-  const fire = window.confetti;
-  if (!fire || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!window.confetti || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const fire = fireFn();
   let origin = { x: 0.5, y: 0.6 };
   const r = el?.getBoundingClientRect?.();
   if (r && r.width) origin = { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight };

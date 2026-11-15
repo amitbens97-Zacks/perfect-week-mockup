@@ -44,7 +44,7 @@ function Chip({ it, i, small }) {
 }
 
 // items: [{ id, day, at, label, type, late, hi }]
-export function WeekBoard({ items, focus, empty, class: cls = '' }) {
+export function WeekBoard({ items, focus, empty, onClose, class: cls = '' }) {
   const types = [...new Set(items.map((x) => legendKey(x.type)))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   return html`<div class=${cx('paper flex min-h-0 flex-col rounded-[18px] p-3 md:p-4', cls)}>
     <div class="mb-2 flex items-end justify-between gap-2">
@@ -52,7 +52,10 @@ export function WeekBoard({ items, focus, empty, class: cls = '' }) {
         <span class="hand block text-[30px] leading-none">${g('השבוע של', 'השבוע של')} ${USER.firstName}</span>
         <span class="relative -mt-1 block h-2 w-28"><${PencilLine} class="absolute inset-0 h-2 w-full" /></span>
       </div>
-      <span class="text-[13px] font-bold text-muted">${WEEK_LABEL}</span>
+      <span class="flex items-center gap-1">
+        <span class="text-[13px] font-bold text-muted">${WEEK_LABEL}</span>
+        ${onClose && html`<button type="button" onClick=${onClose} aria-label="לסגור את הלוח" title="לסגור את הלוח" class="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-ink cursor-pointer"><${Icon} name="chevrons-left" size=${17} /></button>`}
+      </span>
     </div>
     ${focus &&
     html`<div class="rise mb-2 flex items-center gap-2 rounded-xl bg-ink px-3 py-1.5 text-[13px] font-bold text-white">

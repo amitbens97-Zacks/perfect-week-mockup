@@ -9,8 +9,10 @@ import { PartnerBubble, Progress, TopBar, BottomBar, Status, PrimaryButton, Butt
 import { EXPLAIN, ExplainButton, SharkTalk } from './explain.js';
 import { STEP, USER, SCENARIOS, LAST_NUMS, FOLLOWUPS, VALUE, g } from './data.js';
 import { eventsOf, followupsOf, postsOf, lastTasksOf, focusOf, defaultTasks, nextOption, placeBlocks, loadOf } from './calc.js';
-import { Opening, LastWeek, WeekScreen, Followups, Numbers, Focus, Meeting, Tasks, Done } from './screens.js';
+import { Opening, LastWeek, Followups, Numbers, Focus, Meeting, Tasks, Done } from './screens.js';
+import { WeekScreen } from './calendar.js';
 import { Home } from './home.js';
+import { weekGoalOf } from './goal.js';
 import { DevPanel } from './devnotes.js';
 import { EMBED, IS_PHONE, readView, saveView, writeHandoff, takeHandoff, applyPhoneViewport, ViewToggle, PhonePreview } from './viewswitch.js';
 
@@ -105,6 +107,7 @@ function App({ view: shellView, onViewChange }) {
   const setPosts = (fn) => setS((x) => ({ ...x, posts: fn(x.posts ?? posts) }));
   const lastTasks = lastTasksOf(sc);
   const focus = sc.goal ? focusOf(s.closed && s.thuNums ? s.thuNums : s.nums, sc) : null;
+  const goal = weekGoalOf(focus); // the week's goal: on the focus screen, then on the home map
 
   const carryTask = () => lastTasks.find((t) => !sRef.current.lastDone[t.id] && sRef.current.carry[t.id] !== false) || null;
   const withTasks = (x) => (x.tasks ? x : { ...x, tasks: defaultTasks(sc, focus, sc.first || x.closed ? null : carryTask()) });
@@ -266,7 +269,7 @@ function App({ view: shellView, onViewChange }) {
   const shownFocus = (reached('focus') || pos === 999) && focus ? focus : null;
 
   if (screen === 'home')
-    return html`<${Home} s=${s} set=${setS} tasks=${placed} items=${items} focus=${shownFocus} drawn=${s.drawn} mode=${mode} setMode=${setMode}
+    return html`<${Home} s=${s} set=${setS} tasks=${placed} items=${items} focus=${shownFocus} goal=${goal} step=${sc.step} drawn=${s.drawn} mode=${mode} setMode=${setMode}
         onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} />
       <${Toast} toast=${toast} onUndo=${undoToast} />
       <${DevPanel} open=${dev} onClose=${() => setDev(false)} onJump=${jump} onReset=${reset} scenario=${s.scId} onScenario=${changeScenario} />
@@ -310,10 +313,10 @@ function App({ view: shellView, onViewChange }) {
   const body = {
     opening: html`<${Opening} parts=${parts} s=${s} />`,
     last: html`<${LastWeek} ...${common} tasks=${lastTasks} />`,
-    week: html`<${WeekScreen} sc=${sc} events=${events} posts=${posts} setEvents=${setEvents} setPosts=${setPosts} items=${items} notify=${notify} connected=${sc.calendar} onConnect=${() => (setS((x) => ({ ...x, connected: true })), notify('Google Calendar חובר. הכריש קרא את השבוע', 'calendar-check'))} />`,
+    week: html`<${WeekScreen} sc=${sc} events=${events} posts=${posts} setEvents=${setEvents} setPosts=${setPosts} notify=${notify} connected=${sc.calendar} onConnect=${() => (setS((x) => ({ ...x, connected: true })), notify('Google Calendar חובר. הכריש קרא את השבוע', 'calendar-check'))} />`,
     followups: html`<${Followups} list=${fups} s=${s} onSent=${sent} onUnsend=${unsend} setMsg=${(id, v) => setS((x) => ({ ...x, msgs: { ...x.msgs, [id]: v } }))} notify=${notify} items=${items} />`,
     numbers: html`<${Numbers} ...${common} />`,
-    focus: html`<${Focus} s=${s.closed && s.thuNums ? { ...s, nums: s.thuNums } : s} focus=${focus} items=${items} />`,
+    focus: html`<${Focus} s=${s.closed && s.thuNums ? { ...s, nums: s.thuNums } : s} focus=${focus} goal=${goal} items=${items} />`,
     meeting: meeting && html`<${Meeting} meeting=${meeting} ...${common} soon=${meeting.day <= 2} />`,
     tasks: s.tasks && html`<${Tasks} ...${common} sc=${sc} tasks=${placed} load=${load} focus=${shownFocus} onSwap=${swap} onBack=${unswap} notify=${notify} />`,
     done: s.tasks && html`<${Done} s=${s} set=${setS} sc=${sc} tasks=${placed} items=${items} focus=${shownFocus} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} setRem=${(k, v) => setS((x) => ({ ...x, reminders: { ...x.reminders, [k]: { ...x.reminders[k], ...v } } }))} />`,

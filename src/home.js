@@ -5,6 +5,7 @@ import { Check, TaskRow } from './steps.js';
 import { Button, Logo, SharkAvatar } from './components.js';
 import { Sheet, inputCls } from './ui.js';
 import { DayList } from './board.js';
+import { JourneyMap } from './goal.js';
 import { USER, DAYS, METRICS, HISTORY, VALUE, WEEK_LABEL, g } from './data.js';
 import { fmt, num } from './calc.js';
 
@@ -56,7 +57,7 @@ function Notice({ icon, title, text, action, onClick }) {
   </button>`;
 }
 
-export function Home({ s, set, tasks, items, focus, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
+export function Home({ s, set, tasks, items, focus, goal, step, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
   const [board, setBoard] = useState(false);
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
   return html`<div class="fb-notebook flex h-dvh flex-col text-ink" dir="rtl">
@@ -74,11 +75,7 @@ export function Home({ s, set, tasks, items, focus, drawn, mode, setMode, onDraw
         <h1 class="fb-h1 mb-1 text-[28px] md:text-[34px]">${g('בוקר טוב', 'בוקר טוב')}, <span class="fb-marker">${USER.firstName}</span></h1>
         <p class="mb-6 text-[16px] text-muted">${USER.business} · ${mode === 'wed' || mode === 'wed-open' ? 'רביעי 18.11' : mode === 'thu' || mode === 'thu-open' ? 'חמישי 19.11' : 'ראשון 15.11'}</p>
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <section class="paper flex min-h-[320px] flex-col items-center justify-center rounded-[18px] p-6 text-center text-muted">
-            <${Icon} name="map" size=${44} class="mb-2 text-brand-300" />
-            <b class="block font-display text-[18px] text-ink">המפה של המסע</b>
-            <span class="text-[14px]">כמו בדשבורד. כאן המוק-אפ מראה רק את כרטיס השבוע.</span>
-          </section>
+          <${JourneyMap} step=${step} goal=${goal} drawn=${drawn} />
           <${WeekCard} s=${s} tasks=${tasks} focus=${focus} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
         </div>
       </div>

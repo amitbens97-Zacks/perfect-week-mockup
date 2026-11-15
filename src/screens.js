@@ -5,20 +5,36 @@ import { Button, SharkAvatar, InlineEdit } from './components.js';
 import { inputCls, Tag } from './ui.js';
 import { WeekBoard, MiniWeek, TYPE } from './board.js';
 import { TaskRow } from './steps.js';
+import { GoalMap } from './goal.js';
 import { USER, DAYS, METRICS, DECISIONS, KIND, VALUE, WEEK_LABEL, LAST_WEEK_LABEL, PARTNER, g } from './data.js';
 import { fmt, num, hours, monthPace, dayName, toMin } from './calc.js';
 
 // ---------- the frame ----------
-export function Frame({ title, sub, items, focus, empty, children, wideBoard }) {
-  return html`<div class=${cx('mx-auto h-full max-w-[1320px] px-4 py-5 md:px-8 lg:grid lg:gap-8 lg:py-5', wideBoard ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,600px)]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]')}>
+// The week board sits beside the screen only where the screen uses it (the tasks and the end).
+// Elsewhere it starts closed, behind a tab on the side, and opens on a click.
+export function Frame({ title, sub, items, focus, empty, children, board = 'closed' }) {
+  const [open, setOpen] = useState(board === 'open');
+  return html`<div class=${cx('mx-auto h-full px-4 py-5 md:px-8 lg:py-5', open ? 'max-w-[1320px] lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)] lg:gap-8' : 'max-w-[880px]')}>
     <div class="thin-scroll min-w-0 lg:h-full lg:overflow-y-auto lg:pe-1">
       <${MiniWeek} items=${items} focus=${focus} />
       <h1 class="fb-h1 mb-1.5 text-[26px] md:text-[32px]">${title[0]}<span class="fb-marker">${title[1]}</span>${title[2] || ''}</h1>
       ${sub && html`<p class="mb-4 max-w-[60ch] text-[17px] text-muted">${sub}</p>`}
       ${children}
     </div>
-    <div class="hidden min-h-0 lg:flex"><${WeekBoard} items=${items} focus=${focus} empty=${empty} class="w-full" /></div>
+    ${open
+      ? html`<div class="hidden min-h-0 lg:flex"><${WeekBoard} items=${items} focus=${focus} empty=${empty} onClose=${() => setOpen(false)} class="w-full rise" /></div>`
+      : html`<${BoardTab} count=${items.length} onClick=${() => setOpen(true)} />`}
   </div>`;
+}
+
+// The closed board: a tab on the side of the screen, with how many things are already on it.
+function BoardTab({ count, onClick }) {
+  return html`<button type="button" onClick=${onClick} aria-label="לפתוח את הלוח של השבוע" class="paper absolute left-0 top-1/2 z-10 hidden -translate-y-1/2 flex-col items-center gap-2 rounded-e-[16px] rounded-s-none px-2 py-3.5 text-brand-700 shadow-[0_8px_22px_-10px_rgba(45,62,102,.45)] hover:bg-brand-50 lg:flex cursor-pointer">
+    <${Icon} name="calendar-range" size=${20} />
+    <span class="text-[14px] font-bold [writing-mode:vertical-rl]">הלוח של השבוע</span>
+    ${count > 0 && html`<span class="grid h-6 min-w-6 place-items-center rounded-full bg-brand-600 px-1 text-[12px] font-black text-white tabular-nums">${count}</span>`}
+    <${Icon} name="chevrons-right" size=${16} class="text-muted" />
+  </button>`;
 }
 
 // Where a prefilled value came from.
@@ -158,132 +174,7 @@ export function LastWeek({ s, set, tasks, items }) {
   <//>`;
 }
 
-// ---------- 2a. what's already in the week ----------
-// Everything here is editable: the calendar events (the FlowBiz meeting too) and the posts. A tap
-// on a line opens it; "להוסיף" adds one. Calendar edits go back to Google Calendar, post edits to
-// the week plan of "מכונת תוכן".
-const EVENT_KINDS = [
-  ['client', 'פגישת ליווי'],
-  ['sales', 'שיחת היכרות'],
-  ['group', 'סדנה'],
-  ['mentor', 'פגישת FlowBiz'],
-  ['personal', 'אישי'],
-];
-const POST_STATES = ['מתוזמן', 'לצלם ולהעלות', 'טיוטה'];
-const selCls = 'h-9 rounded-lg border border-line bg-white px-2 text-[14px]';
-const byTime = (a, b) => a.day - b.day || (a.from || a.at).localeCompare(b.from || b.at);
-
-function ItemEditor({ item, post, isNew, onSave, onCancel, onDelete }) {
-  const [d, setD] = useState(item);
-  const put = (k) => (e) => setD((x) => ({ ...x, [k]: k === 'day' ? Number(e.target.value) : e.target.value }));
-  const bad = !post && d.to <= d.from;
-  const ok = d.title.trim() && !bad;
-  const save = () => ok && onSave({ ...d, title: d.title.trim(), short: d.title === item.title ? item.short : undefined });
-  return html`<div class="rise my-1 rounded-xl bg-canvas p-2.5 ring-1 ring-brand-200">
-    <input value=${d.title} onInput=${put('title')} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), e.stopPropagation(), save())} placeholder=${post ? 'מה מפרסמים?' : 'מה ביומן?'} aria-label="כותרת" class=${cx(inputCls, '!h-10 mb-2')} autoFocus />
-    <div class="flex flex-wrap items-center gap-1.5">
-      <select value=${d.day} onChange=${put('day')} class=${selCls} aria-label="יום">${DAYS.map((x) => html`<option value=${x.id}>${x.name} ${x.date}</option>`)}</select>
-      ${post
-        ? html`<input type="time" dir="ltr" step="900" value=${d.at} onInput=${put('at')} class=${cx(selCls, 'tabular-nums')} aria-label="שעה" />
-            <select value=${d.state} onChange=${put('state')} class=${selCls} aria-label="מצב">${POST_STATES.map((x) => html`<option value=${x}>${x}</option>`)}</select>`
-        : html`<input type="time" dir="ltr" step="900" value=${d.from} onInput=${put('from')} class=${cx(selCls, 'tabular-nums')} aria-label="משעה" />
-            <span class="text-muted">עד</span>
-            <input type="time" dir="ltr" step="900" value=${d.to} onInput=${put('to')} class=${cx(selCls, 'tabular-nums', bad && '!border-error')} aria-label="עד שעה" />
-            <select value=${d.kind} onChange=${put('kind')} class=${selCls} aria-label="סוג">${EVENT_KINDS.map(([k, l]) => html`<option value=${k}>${l}</option>`)}</select>`}
-    </div>
-    ${bad && html`<p class="mt-1 text-[13px] font-bold text-error">שעת הסיום לפני ההתחלה</p>`}
-    <div class="mt-2 flex items-center gap-2">
-      <${Button} variant="mini" onClick=${save} disabled=${!ok}><${Icon} name="check" size=${15} />${isNew ? 'להוסיף' : 'לשמור'}<//>
-      <${Button} variant="quiet" onClick=${onCancel}>ביטול<//>
-      ${!isNew && html`<button type="button" onClick=${onDelete} class="ms-auto inline-flex items-center gap-1 text-[14px] font-bold text-error hover:underline cursor-pointer"><${Icon} name="trash-2" size=${15} />למחוק</button>`}
-    </div>
-  </div>`;
-}
-
-function ItemRow({ it, post, onOpen }) {
-  const T = TYPE[post ? 'post' : it.kind] || TYPE.client;
-  const gold = !post && it.kind === 'mentor';
-  return html`<button type="button" onClick=${onOpen} class=${cx('group flex w-full items-center gap-2 rounded-lg px-2 py-1 text-start cursor-pointer', gold ? 'bg-[#fbf1da] hover:ring-1 hover:ring-gold' : 'hover:bg-canvas')}>
-    <b class="w-6 shrink-0 text-center font-display text-[14px]">${DAYS[it.day].short}</b>
-    <span class="w-[86px] shrink-0 text-[13px] tabular-nums text-muted" dir="ltr">${post ? it.at : `${it.from}-${it.to}`}</span>
-    <${Icon} name=${T.icon} size=${15} class=${cx('shrink-0', gold ? 'text-ink' : 'text-muted')} />
-    <span class=${cx('min-w-0 flex-1 truncate text-[15px]', it.kind === 'personal' && 'text-muted')}>${it.title}</span>
-    ${gold && html`<span class="whitespace-nowrap text-[12px] font-bold text-ink">נכין לה שאלות</span>`}
-    ${post && html`<${Tag} tone=${it.state === 'מתוזמן' ? 'live' : 'draft'}>${it.state}<//>`}
-    <${Icon} name="pencil" size=${14} class="shrink-0 text-faint group-hover:text-brand-600" />
-  </button>`;
-}
-
-// One editable list: the calendar or the posts.
-function EditList({ list, post, onChange, notify }) {
-  const [open, setOpen] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const blank = post ? { id: '', day: 0, at: '19:00', title: '', state: 'טיוטה', type: 'ערך' } : { id: '', day: 0, from: '12:00', to: '13:00', title: '', kind: 'client' };
-  const what = post ? 'הפוסט' : 'האירוע';
-  const save = (x) => {
-    onChange((l) => l.map((y) => (y.id === x.id ? x : y)));
-    setOpen(null);
-    notify(post ? 'עודכן גם במכונת התוכן' : 'עודכן גם ב-Google Calendar', 'check');
-  };
-  const add = (x) => {
-    onChange((l) => [...l, { ...x, id: `n${Date.now()}` }]);
-    setAdding(false);
-    notify(post ? 'נוסף לתוכנית של מכונת התוכן' : 'נוסף ל-Google Calendar', 'plus');
-  };
-  const del = (x) => {
-    onChange((l) => l.filter((y) => y.id !== x.id));
-    setOpen(null);
-    notify(`${what} נמחק`, 'trash-2', () => onChange((l) => [...l, x]));
-  };
-  return html`<div class="flex flex-col">
-    ${[...list].sort(byTime).map((it) =>
-      open === it.id
-        ? html`<${ItemEditor} key=${it.id} item=${it} post=${post} onSave=${save} onCancel=${() => setOpen(null)} onDelete=${() => del(it)} />`
-        : html`<${ItemRow} key=${it.id} it=${it} post=${post} onOpen=${() => (setAdding(false), setOpen(it.id))} />`,
-    )}
-    ${adding
-      ? html`<${ItemEditor} item=${blank} post=${post} isNew onSave=${add} onCancel=${() => setAdding(false)} />`
-      : html`<button type="button" onClick=${() => (setOpen(null), setAdding(true))} class="mt-1 inline-flex items-center gap-1.5 self-start rounded-lg px-2 py-1 text-[14px] font-bold text-brand-600 hover:bg-brand-50 cursor-pointer"><${Icon} name="plus" size=${15} />${post ? 'להוסיף פוסט' : 'להוסיף ליומן'}</button>`}
-  </div>`;
-}
-
-export function WeekScreen({ sc, events, posts, setEvents, setPosts, items, notify, onConnect, connected }) {
-  const meetH = hours(events.filter((e) => e.kind !== 'personal').reduce((t, e) => t + toMin(e.to) - toMin(e.from), 0));
-  return html`<${Frame} title=${['מה כבר ', 'קבוע', ' השבוע']} sub="הכריש הביא את מה שכבר בלוח. משהו השתנה? לוחצים על השורה ומתקנים." items=${items}>
-    <div class="flex flex-col gap-3">
-      ${connected
-        ? html`<div class="fb-panel !px-3 !py-3">
-            <div class="mb-1.5 flex items-center gap-3 px-1">
-              <span class="fb-chip-ic h-9 w-9"><${Icon} name="calendar-days" size=${18} /></span>
-              <div class="min-w-0 flex-1"><b class="block text-[16px] leading-tight">${events.length} אירועים ביומן</b><span class="text-[13px] text-muted">${meetH} שעות של פגישות עסקיות</span></div>
-              <${From}>Google Calendar<//>
-            </div>
-            <${EditList} list=${events} onChange=${setEvents} notify=${notify} />
-          </div>`
-        : html`<div class="fb-panel !p-4">
-            <div class="flex items-start gap-3">
-              <span class="fb-chip-ic h-10 w-10"><${Icon} name="calendar-x" size=${20} /></span>
-              <div class="min-w-0 flex-1">
-                <b class="block text-[17px]">היומן עוד לא מחובר</b>
-                <span class="mb-2.5 block text-[14px] text-muted">עם יומן, הכריש רואה את הפגישות ושם את המשימות בשעות הפנויות. בלעדיו ממשיכים כרגיל.</span>
-                <${Button} variant="mini" onClick=${onConnect}><${Icon} name="link" size=${15} />לחבר את Google Calendar<//>
-              </div>
-            </div>
-          </div>`}
-      ${(sc.content || posts.length > 0) &&
-      html`<div class="fb-panel !px-3 !py-3">
-        <div class="mb-1.5 flex items-center gap-3 px-1">
-          <span class="fb-chip-ic h-9 w-9"><${Icon} name="megaphone" size=${18} /></span>
-          <b class="min-w-0 flex-1 text-[16px]">מה מפרסמים השבוע</b>
-          <${From}>מכונת תוכן<//>
-        </div>
-        <${EditList} list=${posts} post onChange=${setPosts} notify=${notify} />
-      </div>`}
-      ${sc.step >= 10 && !sc.content && posts.length === 0 &&
-      html`<button type="button" onClick=${() => notify('נפתח "מכונת תוכן שיווקי" על השבוע הזה', 'megaphone')} class="lp-option"><${Icon} name="megaphone" size=${18} class="text-brand-600" /><span class="flex-1 font-bold">עוד אין תוכן לשבוע. להכין עכשיו?</span><${Icon} name="chevron-left" size=${16} /></button>`}
-    </div>
-  <//>`;
-}
+// ---------- 2a. what's already in the week: src/calendar.js ----------
 
 // ---------- 2b. follow-ups ----------
 export function Followups({ list, s, onSent, onUnsend, setMsg, notify, items }) {
@@ -363,7 +254,7 @@ export function Numbers({ s, set, items }) {
 }
 
 // ---------- 3b. the focus ----------
-export function Focus({ s, focus, items }) {
+export function Focus({ s, focus, goal, items }) {
   const n = s.nums;
   const stages = [
     { id: 'leads', label: 'פניות', v: n.leads, t: METRICS[0].target },
@@ -397,6 +288,7 @@ export function Focus({ s, focus, items }) {
         <p class="mt-1.5 text-[14px] font-bold text-brand-300">המשימה הראשונה של השבוע תצא מכאן.</p>
       </div>
     </div>`}
+    <${GoalMap} goal=${goal} nums=${n} />
     <div class="fb-panel !p-4">
       <div class="mb-1.5 flex items-baseline justify-between gap-2">
         <b class="text-[15px]">נובמבר: ${fmt(USER.monthSoFar)} מתוך ${fmt(USER.goalMonth)}</b>
@@ -524,7 +416,7 @@ export function Tasks({ s, set, sc, tasks, load, items, focus, onSwap, onBack, n
   };
   const [editH, setEditH] = useState(false);
   const askHours = () => setEditH(true);
-  return html`<${Frame} title=${['שלוש משימות ', 'לשבוע', '']} sub=${sc.step < 11 ? `מהשלבים הבאים שלך במסע, לפי ${s.hoursWeek} השעות שיש לך בשבוע.` : 'בדיוק שלוש: הפוקוס, התוכן, וצעד קדימה במערכת. כל אחת ביום ובשעה פנויה.'} items=${items} focus=${focus}>
+  return html`<${Frame} title=${['שלוש משימות ', 'לשבוע', '']} sub=${sc.step < 11 ? `מהשלבים הבאים שלך במסע, לפי ${s.hoursWeek} השעות שיש לך בשבוע.` : 'בדיוק שלוש: הפוקוס, התוכן, וצעד קדימה במערכת. כל אחת ביום ובשעה פנויה.'} items=${items} focus=${focus} board="open">
     <div class="mb-2 flex flex-col gap-2">
       ${tasks.map((t, i) => html`<${TaskCard} key=${t.slot} t=${t} i=${i}
         onDay=${(d) => setTask(t.id, { day: d })}
@@ -566,7 +458,7 @@ export function Done({ s, set, sc, tasks, items, focus, notify, setRem, onStep, 
     </select>
   </div>`;
   const first = tasks.find((t) => !s.homeDone[t.id]) || tasks[0];
-  return html`<${Frame} title=${['השבוע ', 'מצויר', '']} items=${items} focus=${focus}>
+  return html`<${Frame} title=${['השבוע ', 'מצויר', '']} items=${items} focus=${focus} board="open">
     <div class="mb-2.5 grid grid-cols-2 gap-2">
       <div class="fb-panel flex items-center gap-2.5 !p-3">
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warn-50"><${Icon} name="flame" size=${20} class="text-warn" /></span>
