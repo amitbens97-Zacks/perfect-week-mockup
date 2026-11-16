@@ -5,6 +5,7 @@ import { Check, TaskRow } from './steps.js';
 import { Button, Logo, SharkAvatar } from './components.js';
 import { Sheet, inputCls } from './ui.js';
 import { DayList, WeekBoard } from './board.js';
+import { ItemEditor } from './calendar.js';
 import { USER, DAYS, TODAY, METRICS, HISTORY, VALUE, WEEK_LABEL, g } from './data.js';
 import { fmt, num } from './calc.js';
 
@@ -103,6 +104,31 @@ function MineEditor({ item, isNew, onSave, onCancel, onDelete }) {
   </div>`;
 }
 
+// One of the three tasks, from the board: the task, the day, the hour and how long. A time the user
+// sets stays put (as on the tasks screen); "שהכריש יבחר שעה" gives it back to the automatic choice.
+const LENGTHS = [15, 20, 30, 45, 60, 90, 120];
+const lenLabel = (m) => (m < 60 ? `${m} דק׳` : m === 60 ? 'שעה' : m === 90 ? 'שעה וחצי' : `${m / 60} שעות`);
+function TaskEditor({ t, onSave, onAuto, onCancel }) {
+  const [d, setD] = useState({ text: t.text, day: t.day, at: t.at || '10:00', mins: t.mins });
+  const sel = 'h-10 rounded-lg border border-line bg-white px-2 text-[15px]';
+  const ok = d.text.trim() && d.at;
+  const save = () => ok && onSave({ text: d.text.trim(), day: d.day, mins: d.mins, ...(d.at !== t.at || t.fixAt ? { fixAt: d.at } : {}) });
+  return html`<div>
+    <input value=${d.text} onInput=${(e) => setD((x) => ({ ...x, text: e.target.value }))} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), save())} aria-label="המשימה" class=${cx(inputCls, 'mb-2.5')} autoFocus />
+    <div class="flex flex-wrap items-center gap-1.5">
+      <select value=${d.day} onChange=${(e) => setD((x) => ({ ...x, day: Number(e.target.value) }))} class=${sel} aria-label="יום">${DAYS.slice(0, 6).map((x) => html`<option value=${x.id}>${x.name} ${x.date}</option>`)}</select>
+      <input type="time" dir="ltr" step="900" value=${d.at} onInput=${(e) => setD((x) => ({ ...x, at: e.target.value }))} class=${cx(sel, 'tabular-nums')} aria-label="שעה" />
+      <select value=${d.mins} onChange=${(e) => setD((x) => ({ ...x, mins: Number(e.target.value) }))} class=${sel} aria-label="כמה זמן">${[...new Set([...LENGTHS, t.mins])].sort((x, y) => x - y).map((m) => html`<option value=${m}>${lenLabel(m)}</option>`)}</select>
+    </div>
+    ${t.clash && html`<p class="mt-1.5 text-[13px] font-bold text-warn">השעה הזאת חופפת לפגישה ביומן</p>`}
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      <${Button} variant="mini" onClick=${save} disabled=${!ok}><${Icon} name="check" size=${15} />לשמור<//>
+      <${Button} variant="quiet" onClick=${onCancel}>ביטול<//>
+      ${t.fixAt && html`<button type="button" onClick=${onAuto} class="ms-auto text-[14px] font-bold text-brand-600 hover:underline cursor-pointer">שהכריש יבחר שעה</button>`}
+    </div>
+  </div>`;
+}
+
 // A notification as it appears at the top of the home page (and by email).
 function Notice({ icon, title, text, action, onClick }) {
   return html`<button type="button" onClick=${onClick} class="rise mb-4 flex w-full items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-start text-white shadow-lg cursor-pointer">
@@ -112,15 +138,48 @@ function Notice({ icon, title, text, action, onClick }) {
   </button>`;
 }
 
-export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink, onMove }) {
+export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink, onMove, events = [], posts = [], setEvents, setPosts }) {
   const [board, setBoard] = useState(false);
   const [mine, setMine] = useState(null); // { item, isNew }: a task of the user's own, in the editor
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
   const where = s.connected ? 'ל-Google Calendar' : 'ללוח של השבוע';
   const addOn = (day = TODAY) => setMine({ isNew: true, item: { id: '', day, from: '12:00', to: '13:00', title: '' } });
+  // A tap on a card in the board opens its editor: the user's own task, one of the three, or a
+  // calendar event / a post (the same editor as in "מה כבר קבוע השבוע").
+  const [other, setOther] = useState(null); // { kind: 'task' | 'cal', item }
   const pickMine = (it) => {
-    const m = (s.mine || []).find((x) => x.id === it.mid);
-    if (m) setMine({ item: m });
+    if (it.type === 'mine') {
+      const m = (s.mine || []).find((x) => x.id === it.mid);
+      if (m) setMine({ item: m });
+    } else if (it.type === 'task') {
+      const t = tasks.find((x) => `t${x.id}` === it.id);
+      if (t) setOther({ kind: 'task', item: t });
+    } else if (it.type === 'post') {
+      const p = posts.find((x) => x.id === it.id);
+      if (p) setOther({ kind: 'cal', item: { ...p, src: 'post' } });
+    } else {
+      const e = events.find((x) => x.id === it.id);
+      if (e) setOther({ kind: 'cal', item: { ...e, src: 'event' } });
+    }
+  };
+  const setTaskFields = (id, v) => set((y) => ({ ...y, tasks: (y.tasks || []).map((t) => (t.id === id ? { ...t, ...v } : t)) }));
+  const saveTask = (v) => {
+    setTaskFields(other.item.id, v);
+    notify(s.connected ? 'המשימה עודכנה. גם ב-Google Calendar' : 'המשימה עודכנה', 'check');
+    setOther(null);
+  };
+  const strip = ({ src, key, ...rest }) => rest;
+  const setOf = (src) => (src === 'post' ? setPosts : setEvents);
+  const saveCal = (x) => {
+    setOf(x.src)((l) => l.map((y) => (y.id === x.id ? strip(x) : y)));
+    notify(x.src === 'post' ? 'עודכן גם במכונת התוכן' : 'עודכן גם ב-Google Calendar', 'check');
+    setOther(null);
+  };
+  const delCal = () => {
+    const x = other.item;
+    setOf(x.src)((l) => l.filter((y) => y.id !== x.id));
+    setOther(null);
+    notify(x.src === 'post' ? 'הפוסט נמחק' : 'האירוע נמחק', 'trash-2', () => setOf(x.src)((l) => [...l, strip(x)]));
   };
   const saveMine = (x) => {
     if (mine.isNew) {
@@ -156,6 +215,8 @@ export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, 
       </div>
     </main>
     ${mine && html`<${Sheet} title=${mine.isNew ? 'משימה חדשה ביומן' : 'משימה ביומן'} onClose=${() => setMine(null)}><${MineEditor} item=${mine.item} isNew=${mine.isNew} onSave=${saveMine} onCancel=${() => setMine(null)} onDelete=${delMine} /><//>`}
+    ${other?.kind === 'task' && html`<${Sheet} title="משימה של השבוע" onClose=${() => setOther(null)}><${TaskEditor} t=${other.item} onSave=${saveTask} onAuto=${() => (setTaskFields(other.item.id, { fixAt: null }), setOther(null), notify('הכריש יבחר שעה פנויה', 'clock'))} onCancel=${() => setOther(null)} /><//>`}
+    ${other?.kind === 'cal' && html`<${Sheet} title=${other.item.src === 'post' ? 'הפוסט' : 'האירוע ביומן'} onClose=${() => setOther(null)}><${ItemEditor} item=${other.item} onSave=${saveCal} onCancel=${() => setOther(null)} onDelete=${delCal} /><//>`}
     ${board && html`<${Sheet} title=${`השבוע · ${WEEK_LABEL}`} onClose=${() => setBoard(false)}><${DayList} items=${items} focus=${focus} /><//>`}
     ${mode === 'wed-open' && html`<${WedSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('wed')} notify=${notify} />`}
     ${mode === 'thu-open' && html`<${ThuSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('thu')} notify=${notify} />`}

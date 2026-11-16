@@ -289,7 +289,7 @@ function App({ view: shellView, onViewChange }) {
 
   if (screen === 'home')
     return html`<${Home} s=${s} set=${setS} tasks=${placed} items=${items} focus=${shownFocus} goal=${goal} drawn=${s.drawn} mode=${mode} setMode=${setMode}
-        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} onMove=${moveItem} />
+        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} onMove=${moveItem} events=${events} posts=${posts} setEvents=${setEvents} setPosts=${setPosts} />
       <${Toast} toast=${toast} onUndo=${undoToast} />
       <${DevPanel} open=${dev} onClose=${() => setDev(false)} onJump=${jump} onReset=${reset} scenario=${s.scId} onScenario=${changeScenario} />
       ${devFab(setDev)}`;

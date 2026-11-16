@@ -116,7 +116,7 @@ export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, o
           </div>
           <div class="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
             ${list.map((it, i) => {
-              const pick = onPick && it.type === 'mine' ? () => !swallow.current && onPick(it) : null;
+              const pick = onPick && it.type !== 'followup' ? () => !swallow.current && onPick(it) : null;
               return html`<div
                 key=${it.id}
                 ...${handlers(it)}
@@ -125,7 +125,7 @@ export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, o
                 role=${pick ? 'button' : undefined}
                 tabIndex=${pick ? 0 : undefined}
                 data-card=${canMove(it) ? '' : undefined}
-                title=${pick ? 'לערוך או למחוק. אפשר גם לגרור' : canMove(it) ? 'לגרור ליום אחר' : undefined}
+                title=${pick ? 'לחיצה לעריכה, גרירה ליום אחר' : undefined}
                 class=${cx(canMove(it) && 'touch-none select-none cursor-grab active:cursor-grabbing', pick && 'cursor-pointer hover:opacity-80', drag?.id === it.id && 'opacity-40')}
               ><${Chip} it=${it} i=${i} small /></div>`;
             })}

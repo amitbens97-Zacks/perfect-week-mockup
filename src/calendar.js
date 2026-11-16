@@ -23,7 +23,7 @@ const selCls = 'h-10 rounded-lg border border-line bg-white px-2 text-[15px]';
 const timeOf = (it) => (it.src === 'post' ? it.at : it.from);
 
 // The small editor: title, day, time, and the kind (an event) or the state (a post).
-function ItemEditor({ item, isNew, onSave, onCancel, onDelete }) {
+export function ItemEditor({ item, isNew, onSave, onCancel, onDelete }) {
   const [d, setD] = useState(item);
   const post = d.src === 'post';
   const put = (k) => (e) => setD((x) => ({ ...x, [k]: k === 'day' ? Number(e.target.value) : e.target.value }));
