@@ -4,46 +4,73 @@ import { html, useState, Icon, cx } from './lib.js';
 import { Check, TaskRow } from './steps.js';
 import { Button, Logo, SharkAvatar } from './components.js';
 import { Sheet, inputCls } from './ui.js';
-import { DayList } from './board.js';
-import { JourneyMap } from './goal.js';
+import { DayList, WeekBoard } from './board.js';
 import { USER, DAYS, METRICS, HISTORY, VALUE, WEEK_LABEL, g } from './data.js';
 import { fmt, num } from './calc.js';
 
 const NAV = ['בית', 'יומן', 'משימות', 'כספים', 'קבצים', 'לידים'];
 
-// The week card on the home page.
-function WeekCard({ s, tasks, focus, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard }) {
+// "השבוע שלי" on the home page, the whole width: the goal and the focus on top, the three tasks
+// with their small steps on one side, and the week board (all seven days) on the other.
+// (The journey map lives on the system's own home page, so it is not repeated here.)
+function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard }) {
   // One task open at a time: the one the user picked, else the first one not done yet.
   const [pick, setPick] = useState(null);
+  const link = 'text-[14px] font-bold text-brand-600 hover:underline cursor-pointer';
   if (!drawn)
-    return html`<section class="paper rounded-[18px] p-5">
-      <div class="mb-3 flex items-center gap-3">
-        <${SharkAvatar} size=${48} mood="calm" />
-        <div><b class="block font-display text-[19px]">השבוע עוד לא מצויר</b><span class="text-[14px] text-muted">${WEEK_LABEL} · כ-10 דקות</span></div>
+    return html`<section class="paper flex flex-wrap items-center gap-x-5 gap-y-4 rounded-[18px] p-5 md:p-6">
+      <${SharkAvatar} size=${56} mood="calm" />
+      <div class="min-w-0 flex-1">
+        <span class="hand block text-[34px] leading-none">השבוע שלי</span>
+        <span class="text-[15px] text-muted">השבוע עוד לא מצויר · ${WEEK_LABEL} · כ-10 דקות</span>
+        ${s.streak > 0 && html`<span class="mt-1 flex items-center gap-1.5 text-[14px] font-bold text-muted"><${Icon} name="flame" size=${16} class="text-warn" />${s.streak} שבועות ברצף. ${g('אל תשבור אותו', 'אל תשברי אותו')}</span>`}
       </div>
-      <${Button} class="w-full" onClick=${onDraw}><${Icon} name="calendar-range" size=${20} />צייר לי שבוע מושלם<//>
-      ${s.streak > 0 && html`<p class="mt-3 flex items-center justify-center gap-1.5 text-[14px] font-bold text-muted"><${Icon} name="flame" size=${16} class="text-warn" />${s.streak} שבועות ברצף. ${g('אל תשבור אותו', 'אל תשברי אותו')}</p>`}
-      <button type="button" onClick=${onHistory} class="mt-2 block w-full text-center text-[14px] font-bold text-brand-600 hover:underline cursor-pointer">השבועות הקודמים</button>
+      <div class="flex flex-col items-center gap-2 max-sm:w-full">
+        <${Button} class="max-sm:w-full" onClick=${onDraw}><${Icon} name="calendar-range" size=${20} />צייר לי שבוע מושלם<//>
+        <button type="button" onClick=${onHistory} class=${link}>השבועות הקודמים</button>
+      </div>
     </section>`;
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
   const open = pick === 'none' ? null : pick || tasks.find((t) => !s.homeDone[t.id])?.id;
   const stepsAll = tasks.reduce((n, t) => n + (t.steps || []).length, 0);
   const stepsOn = tasks.reduce((n, t) => n + (s.stepsDone[t.id] || []).filter(Boolean).length, 0);
-  return html`<section class="paper rounded-[18px] p-5">
-    <div class="mb-1 flex items-center justify-between gap-2">
-      <b class="font-display text-[19px]">השבוע שלי</b>
-      <span class="inline-flex items-center gap-1 text-[14px] font-bold"><${Icon} name="flame" size=${16} class="text-warn" />${s.streak}</span>
+  return html`<section class="paper rounded-[18px] p-4 md:p-6">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+      <div class="leading-none">
+        <span class="hand block text-[38px] leading-none">השבוע שלי</span>
+        <span class="text-[14px] font-bold text-muted">${WEEK_LABEL}</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        ${goal &&
+        html`<span class="inline-flex items-center gap-2 rounded-full bg-brand-600 py-1 pe-3.5 ps-1 text-white" title=${goal.sub}>
+          <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/15"><${Icon} name="flag" size=${16} /></span>
+          <span class="leading-tight"><span class="block text-[11px] font-bold text-brand-100">יעד השבוע</span><b class="text-[15px]">${goal.head}</b></span>
+        </span>`}
+        ${focus && html`<span class="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-2 text-[14px] font-bold text-white"><${Icon} name="crosshair" size=${15} class="text-brand-300" />${focus.title}</span>`}
+        <span class="inline-flex items-center gap-1 rounded-full bg-warn-50 px-3 py-2 text-[14px] font-bold text-warn" title="שבועות ברצף"><${Icon} name="flame" size=${16} />${s.streak}</span>
+      </div>
     </div>
-    ${focus && html`<p class="mb-2 flex items-center gap-1.5 text-[14px] font-bold text-brand-700"><${Icon} name="crosshair" size=${14} />הפוקוס: ${focus.title}</p>`}
-    <div class="mb-1 h-2 overflow-hidden rounded-full bg-canvas ring-1 ring-line"><span class="block h-full rounded-full bg-brand-600 transition-all" style=${{ width: `${stepsAll ? (stepsOn / stepsAll) * 100 : 0}%` }}></span></div>
-    <p class="mb-1 text-[13px] text-muted">${stepsOn} מתוך ${stepsAll} צעדים · ${done} מתוך 3 משימות${done === 3 ? '. שבוע מלא!' : ''}</p>
-    <div class="flex flex-col">
-      ${tasks.map((t) => html`<${TaskRow} key=${t.id} t=${t} sd=${s.stepsDone[t.id]} done=${!!s.homeDone[t.id]} open=${open === t.id} onOpen=${() => setPick(open === t.id ? 'none' : t.id)} onStep=${onStep} onTask=${onTask} onLink=${onLink} meta=${`${DAYS[t.day].short} ${t.at || ''}`} />`)}
-    </div>
-    <div class="mt-2 flex items-center justify-between gap-2 text-[14px] font-bold text-brand-600">
-      <button type="button" onClick=${onBoard} class="hover:underline cursor-pointer">ללוח של השבוע</button>
-      <button type="button" onClick=${onDraw} class="hover:underline cursor-pointer">לעדכן את השבוע</button>
-      <button type="button" onClick=${onHistory} class="hover:underline cursor-pointer">השבועות הקודמים</button>
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      <div class="min-w-0">
+        <div class="mb-1 flex items-baseline justify-between gap-2">
+          <b class="text-[16px]">שלוש המשימות</b>
+          <span class="text-[13px] tabular-nums text-muted">${done} מתוך 3${done === 3 ? '. שבוע מלא!' : ''}</span>
+        </div>
+        <div class="mb-1.5 h-2 overflow-hidden rounded-full bg-canvas ring-1 ring-line"><span class="block h-full rounded-full bg-brand-600 transition-all" style=${{ width: `${stepsAll ? (stepsOn / stepsAll) * 100 : 0}%` }}></span></div>
+        <p class="mb-1 text-[13px] text-muted">${stepsOn} מתוך ${stepsAll} צעדים קטנים</p>
+        <div class="flex flex-col">
+          ${tasks.map((t, i) => html`<${TaskRow} key=${t.id} t=${t} i=${i} sd=${s.stepsDone[t.id]} done=${!!s.homeDone[t.id]} open=${open === t.id} onOpen=${() => setPick(open === t.id ? 'none' : t.id)} onStep=${onStep} onTask=${onTask} onLink=${onLink} meta=${`${DAYS[t.day].short} ${t.at || ''}`} />`)}
+        </div>
+        ${goal && html`<p class="mt-3 flex items-start gap-1.5 rounded-xl bg-canvas px-3 py-2 text-[13px] ring-1 ring-line"><${Icon} name="flag" size=${14} class="mt-0.5 shrink-0 text-brand-600" /><span><b>היעדים:</b> ${goal.sub}</span></p>`}
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <button type="button" onClick=${onBoard} class=${cx(link, 'lg:hidden')}>הלוח של השבוע</button>
+          <button type="button" onClick=${onDraw} class=${link}>לעדכן את השבוע</button>
+          <button type="button" onClick=${onHistory} class=${link}>השבועות הקודמים</button>
+        </div>
+      </div>
+      <div class="hidden min-h-[440px] min-w-0 lg:flex">
+        <${WeekBoard} items=${items} bare class="w-full" />
+      </div>
     </div>
   </section>`;
 }
@@ -57,7 +84,7 @@ function Notice({ icon, title, text, action, onClick }) {
   </button>`;
 }
 
-export function Home({ s, set, tasks, items, focus, goal, step, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
+export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
   const [board, setBoard] = useState(false);
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
   return html`<div class="fb-notebook flex h-dvh flex-col text-ink" dir="rtl">
@@ -74,10 +101,7 @@ export function Home({ s, set, tasks, items, focus, goal, step, drawn, mode, set
         ${mode === 'thu' && drawn && html`<${Notice} icon="flag" title="יום חמישי · סוגרים את השבוע" text="30 שניות: מה בוצע והמספרים. ביום ראשון מתחילים ישר מהתכנון." action="לסגור" onClick=${() => setMode('thu-open')} />`}
         <h1 class="fb-h1 mb-1 text-[28px] md:text-[34px]">${g('בוקר טוב', 'בוקר טוב')}, <span class="fb-marker">${USER.firstName}</span></h1>
         <p class="mb-6 text-[16px] text-muted">${USER.business} · ${mode === 'wed' || mode === 'wed-open' ? 'רביעי 18.11' : mode === 'thu' || mode === 'thu-open' ? 'חמישי 19.11' : 'ראשון 15.11'}</p>
-        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <${JourneyMap} step=${step} goal=${goal} drawn=${drawn} />
-          <${WeekCard} s=${s} tasks=${tasks} focus=${focus} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
-        </div>
+        <${WeekCard} s=${s} tasks=${tasks} items=${items} focus=${focus} goal=${goal} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
       </div>
     </main>
     ${board && html`<${Sheet} title=${`השבוע · ${WEEK_LABEL}`} onClose=${() => setBoard(false)}><${DayList} items=${items} focus=${focus} /><//>`}

@@ -202,7 +202,7 @@ export function Followups({ list, s, onSent, onUnsend, setMsg, notify, items }) 
   const firstLeft = list.find((f) => !s.sent[f.id])?.id;
   const openId = pick === 'none' ? null : pick && !s.sent[pick] ? pick : firstLeft;
   const lateTag = (f) => (f.late > 0 ? html`<${Tag} tone="draft">באיחור ${f.late === 1 ? 'יום' : `${f.late} ימים`}<//>` : html`<span class="text-[13px] text-muted">${f.due}</span>`);
-  return html`<${Frame} title=${['למי ', 'לחזור', ' השבוע']} sub=${g('קודם מי שמחכה הכי הרבה. ההודעות מוכנות, בקול שלך.', 'קודם מי שמחכה הכי הרבה. ההודעות מוכנות, בקול שלך.')} items=${items}>
+  return html`<${Frame} title=${['למי ', 'לחזור', ' השבוע']} sub="קודם מי שמחכה הכי הרבה." items=${items}>
     <div class="flex flex-col gap-2">
       ${list.map((f) => {
         const sent = s.sent[f.id];
