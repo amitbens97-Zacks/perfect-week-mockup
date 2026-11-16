@@ -60,7 +60,7 @@ export function Switch({ on, onChange, label, sub }) {
 /// ---------- opening ----------
 // Like the opening of every step: the name, one line, the parts, and a picture of the idea beside
 // them. No board here yet: the board starts filling on the next screen.
-export function Opening({ parts, s }) {
+export function Opening({ parts, s, set }) {
   const streak = s.streak;
   return html`<div class="mx-auto grid min-h-full max-w-[1120px] items-center gap-8 px-4 py-6 max-md:pb-24 md:grid-cols-[1.05fr_0.95fr] md:gap-12 md:px-8">
     <div>
@@ -73,6 +73,7 @@ export function Opening({ parts, s }) {
           <span class="leading-snug"><b class="block text-[15px]">${p.label}</b><span class="text-[13px] text-muted">${p.why}</span></span>
         </li>`)}
       </ol>
+      <${MentorAsk} s=${s} set=${set} />
       ${s.closed && html`<p class="mb-3 flex items-center gap-2 rounded-xl bg-brand-50 px-3 py-2 text-[15px] font-semibold text-brand-900"><${Icon} name="fast-forward" size=${16} class="text-brand-600" />את השבוע שעבר סגרת ביום חמישי, אז מתחילים ישר מהתכנון.</p>`}
       <div class="flex flex-wrap gap-2 text-[14px]">
         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-semibold ring-1 ring-line"><${Icon} name="clock" size=${15} class="text-brand-600" />כ-10 דקות</span>
@@ -83,6 +84,22 @@ export function Opening({ parts, s }) {
       </div>
     </div>
     <${WeekArt} streak=${streak} />
+  </div>`;
+}
+
+// "פגישת המיקוד" is only for users in a FlowBiz mentoring. The account usually knows (a mentor is
+// assigned); when it doesn't, the opening asks once, and the answer is kept (changeable here).
+function MentorAsk({ s, set }) {
+  const put = (v) => set((x) => ({ ...x, mentoring: v }));
+  if (s.mentoring === 'account' || s.mentoring === 'no-account') return null;
+  if (s.mentoring === 'yes' || s.mentoring === 'no')
+    return html`<p class="mb-3 text-[14px] text-muted">ליווי עם FlowBiz: <b class="text-ink">${s.mentoring === 'yes' ? 'כן' : 'לא'}</b> · <button type="button" onClick=${() => put(null)} class="font-bold text-brand-600 hover:underline cursor-pointer">לשנות</button></p>`;
+  return html`<div class="rise mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-white px-4 py-3 ring-1 ring-brand-200">
+    <span class="min-w-0 flex-1"><b class="block text-[16px]">${g('אתה בתהליך ליווי עם FlowBiz?', 'את בתהליך ליווי עם FlowBiz?')}</b><span class="text-[13px] text-muted">שואלים פעם אחת. אם כן, נכין שאלות לפגישת המיקוד.</span></span>
+    <span class="flex gap-1.5">
+      <button type="button" onClick=${() => put('yes')} class="h-9 rounded-lg bg-brand-600 px-4 text-[14px] font-bold text-white hover:bg-brand-700 cursor-pointer">כן</button>
+      <button type="button" onClick=${() => put('no')} class="h-9 rounded-lg bg-white px-4 text-[14px] font-bold text-ink ring-1 ring-line hover:ring-brand-300 cursor-pointer">לא</button>
+    </span>
   </div>`;
 }
 
@@ -254,7 +271,7 @@ export function Numbers({ s, set, items }) {
 }
 
 // ---------- 3b. the focus ----------
-export function Focus({ s, focus, goal, items }) {
+export function Focus({ s, focus, goal, onGoal, items }) {
   const n = s.nums;
   const stages = [
     { id: 'leads', label: 'פניות', v: n.leads, t: METRICS[0].target },
@@ -288,7 +305,7 @@ export function Focus({ s, focus, goal, items }) {
         <p class="mt-1.5 text-[14px] font-bold text-brand-300">המשימה הראשונה של השבוע תצא מכאן.</p>
       </div>
     </div>`}
-    <${GoalMap} goal=${goal} nums=${n} />
+    <${GoalMap} goal=${goal} nums=${n} onEdit=${onGoal} />
     <div class="fb-panel !p-4">
       <div class="mb-1.5 flex items-baseline justify-between gap-2">
         <b class="text-[15px]">נובמבר: ${fmt(USER.monthSoFar)} מתוך ${fmt(USER.goalMonth)}</b>
@@ -337,35 +354,46 @@ export function Meeting({ meeting, s, set, items, soon }) {
 }
 
 /// ---------- 5. three tasks ----------
-// Each task comes with small steps (the model writes them with the task). Here they can be opened
-// and edited; ticking them happens during the week (done screen, home card).
-function TaskCard({ t, i, onDay, onSwap, onBack, onText, onShorten, onSteps }) {
+// One clean card per task: the task, one line with its kind and its time, and two quiet buttons.
+// A tap on the time opens a small editor (day, hour, length); a time the user set stays put.
+// The small steps open from the same line and can be edited.
+const LENGTHS = [15, 20, 30, 45, 60, 90, 120];
+const lenLabel = (m) => (m < 60 ? `${m} דק׳` : m === 60 ? 'שעה' : m === 90 ? 'שעה וחצי' : `${m / 60} שעות`);
+function WhenEditor({ t, onSave, onAuto, onCancel }) {
+  const [d, setD] = useState({ day: t.day, at: t.at || '10:00', mins: t.mins });
+  const sel = 'h-9 rounded-lg border border-line bg-white px-2 text-[14px]';
+  return html`<div class="rise mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-canvas p-2 ring-1 ring-brand-200">
+    <select value=${d.day} onChange=${(e) => setD((x) => ({ ...x, day: Number(e.target.value) }))} class=${sel} aria-label="יום">${DAYS.slice(0, 6).map((x) => html`<option value=${x.id}>${x.name} ${x.date}</option>`)}</select>
+    <input type="time" dir="ltr" step="900" value=${d.at} onInput=${(e) => setD((x) => ({ ...x, at: e.target.value }))} class=${cx(sel, 'tabular-nums')} aria-label="שעה" />
+    <select value=${d.mins} onChange=${(e) => setD((x) => ({ ...x, mins: Number(e.target.value) }))} class=${sel} aria-label="כמה זמן">${[...new Set([...LENGTHS, t.mins])].sort((x, y) => x - y).map((m) => html`<option value=${m}>${lenLabel(m)}</option>`)}</select>
+    <${Button} variant="mini" disabled=${!d.at} onClick=${() => onSave(d)}><${Icon} name="check" size=${15} />לשמור<//>
+    <${Button} variant="quiet" onClick=${onCancel}>ביטול<//>
+    ${t.fixAt && html`<button type="button" onClick=${onAuto} class="ms-auto text-[13px] font-bold text-brand-600 hover:underline cursor-pointer">שהכריש יבחר שעה</button>`}
+  </div>`;
+}
+
+function TaskCard({ t, i, onWhen, onSwap, onBack, onText, onShorten, onSteps }) {
   const K = KIND[t.kind] || KIND.focus;
   const [open, setOpen] = useState(false);
+  const [when, setWhen] = useState(false);
   const steps = t.steps || [];
-  return html`<div class="fb-panel !px-3.5 !py-2.5">
+  const iconBtn = 'grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-brand-600 cursor-pointer';
+  return html`<div class="fb-panel !px-4 !py-3">
     <div class="flex items-start gap-3">
       <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-600 font-display text-[14px] font-black text-white">${i + 1}</span>
       <div class="min-w-0 flex-1">
-        <div class="mb-1 flex flex-wrap items-center gap-1.5">
-          <${Tag} tone=${t.kind === 'focus' ? 'blue' : t.kind === 'system' ? 'live' : 'muted'}><${Icon} name=${K.icon} size=${12} />${K.label}<//>
-          ${t.carried && html`<${Tag}><${Icon} name="undo-2" size=${12} />גם מהשבוע שעבר<//>`}
-          <span class="text-[13px] text-muted">כ-${t.mins} דק׳</span>
-          <span class="ms-auto flex items-center gap-1" role="radiogroup" aria-label="יום">
-            ${DAYS.slice(0, 6).map((d) => html`<button key=${d.id} type="button" role="radio" aria-checked=${t.day === d.id} onClick=${() => onDay(d.id)} title=${`יום ${d.name}`} class=${cx('h-7 w-7 rounded-lg text-[13px] font-bold transition-colors cursor-pointer', t.day === d.id ? 'bg-brand-600 text-white' : 'bg-canvas text-ink ring-1 ring-line hover:ring-brand-300')}>${d.short}</button>`)}
-          </span>
-        </div>
         <${InlineEdit} value=${t.text} onSave=${onText} class="text-[16px] font-bold leading-snug" />
-        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px]">
-          ${t.at && html`<span class="font-bold tabular-nums text-brand-700"><${Icon} name="clock" size=${13} class="inline align-[-2px]" /> ${dayName(t.day)} ${t.at}-${t.until}</span>`}
-          ${steps.length > 0 && html`<button type="button" onClick=${() => setOpen((o) => !o)} aria-expanded=${open} class="inline-flex items-center gap-1 font-bold text-ink hover:text-brand-600 cursor-pointer"><${Icon} name="list-checks" size=${14} />${steps.length} צעדים קטנים<${Icon} name="chevron-down" size=${13} class=${cx('transition-transform', open && 'rotate-180')} /></button>`}
-          ${t.moved && html`<span class="text-warn">היום מלא, עבר ליום ${dayName(t.day)}</span>`}
-          <span class="ms-auto flex items-center gap-3">
-            ${onShorten && html`<button type="button" onClick=${onShorten} title=${t.short.text} class="inline-flex items-center gap-1 rounded-md bg-warn-50 px-1.5 font-bold text-warn hover:underline cursor-pointer"><${Icon} name="scissors" size=${14} />לקצר ל-${t.short.mins} דק׳</button>`}
-            ${t.prev && html`<button type="button" onClick=${onBack} class="inline-flex items-center gap-1 font-bold text-muted hover:text-brand-600 cursor-pointer"><${Icon} name="undo-2" size=${14} />להצעה הקודמת</button>`}
-            <button type="button" onClick=${onSwap} class="inline-flex items-center gap-1 font-bold text-brand-600 hover:underline cursor-pointer"><${Icon} name="refresh-cw" size=${14} />הצעה אחרת</button>
-          </span>
+        <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+          <span class="inline-flex items-center gap-1 text-muted"><${Icon} name=${K.icon} size=${13} />${K.label}${t.carried ? ' · מהשבוע שעבר' : ''}</span>
+          <button type="button" onClick=${() => setWhen((w) => !w)} aria-expanded=${when} title="לשנות יום ושעה" class=${cx('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-bold tabular-nums ring-1 cursor-pointer', t.clash ? 'bg-warn-50 text-warn ring-[#ecd3a8]' : 'bg-brand-50 text-brand-700 ring-brand-200 hover:ring-brand-600')}>
+            <${Icon} name="clock" size=${13} />${t.at ? `${dayName(t.day)} ${t.at}-${t.until}` : `${dayName(t.day)} · אין שעה פנויה`}<${Icon} name="pencil" size=${12} class="opacity-60" />
+          </button>
+          ${steps.length > 0 && html`<button type="button" onClick=${() => setOpen((o) => !o)} aria-expanded=${open} class="inline-flex items-center gap-1 font-bold text-ink hover:text-brand-600 cursor-pointer"><${Icon} name="list-checks" size=${14} />${steps.length} צעדים<${Icon} name="chevron-down" size=${13} class=${cx('transition-transform', open && 'rotate-180')} /></button>`}
+          ${t.clash && html`<span class="font-bold text-warn">חופף לפגישה ביומן</span>`}
+          ${!t.clash && t.moved && html`<span class="text-warn">היום מלא, עבר ליום ${dayName(t.day)}</span>`}
+          ${onShorten && html`<button type="button" onClick=${onShorten} title=${t.short.text} class="inline-flex items-center gap-1 rounded-md bg-warn-50 px-1.5 font-bold text-warn hover:underline cursor-pointer"><${Icon} name="scissors" size=${14} />לקצר ל-${t.short.mins} דק׳</button>`}
         </div>
+        ${when && html`<${WhenEditor} t=${t} onSave=${(d) => (onWhen({ day: d.day, fixAt: d.at, mins: d.mins }), setWhen(false))} onAuto=${() => (onWhen({ fixAt: null }), setWhen(false))} onCancel=${() => setWhen(false)} />`}
         ${open &&
         html`<ol class="rise mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5" aria-label="צעדים קטנים">
           ${steps.map((st, k) => html`<li key=${`${t.id}-${k}`} class="flex items-center gap-2 text-[14px]">
@@ -374,6 +402,10 @@ function TaskCard({ t, i, onDay, onSwap, onBack, onText, onShorten, onSteps }) {
           </li>`)}
           ${steps.length < 5 && html`<li><button type="button" onClick=${() => onSteps([...steps, 'צעד חדש'])} class="inline-flex items-center gap-1 text-[13px] font-bold text-brand-600 hover:underline cursor-pointer"><${Icon} name="plus" size=${14} />עוד צעד</button></li>`}
         </ol>`}
+      </div>
+      <div class="-me-1 -mt-1 flex shrink-0 items-center">
+        ${t.prev && html`<button type="button" onClick=${onBack} title="להצעה הקודמת" aria-label="להצעה הקודמת" class=${iconBtn}><${Icon} name="undo-2" size=${17} /></button>`}
+        <button type="button" onClick=${onSwap} title="הצעה אחרת" aria-label="הצעה אחרת" class=${iconBtn}><${Icon} name="refresh-cw" size=${17} /></button>
       </div>
     </div>
   </div>`;
@@ -416,10 +448,10 @@ export function Tasks({ s, set, sc, tasks, load, items, focus, onSwap, onBack, n
   };
   const [editH, setEditH] = useState(false);
   const askHours = () => setEditH(true);
-  return html`<${Frame} title=${['שלוש משימות ', 'לשבוע', '']} sub=${sc.step < 11 ? `מהשלבים הבאים שלך במסע, לפי ${s.hoursWeek} השעות שיש לך בשבוע.` : 'בדיוק שלוש: הפוקוס, התוכן, וצעד קדימה במערכת. כל אחת ביום ובשעה פנויה.'} items=${items} focus=${focus} board="open">
+  return html`<${Frame} title=${['שלוש משימות ', 'לשבוע', '']} sub=${sc.step < 11 ? `מהשלבים הבאים שלך במסע, לפי ${s.hoursWeek} השעות שלך בשבוע.` : 'הפוקוס, התוכן, וצעד קדימה במערכת. לחיצה על השעה משנה אותה.'} items=${items} focus=${focus} board="open">
     <div class="mb-2 flex flex-col gap-2">
       ${tasks.map((t, i) => html`<${TaskCard} key=${t.slot} t=${t} i=${i}
-        onDay=${(d) => setTask(t.id, { day: d })}
+        onWhen=${(v) => (setTask(t.id, v), notify(v.fixAt === null ? 'הכריש יבחר שעה פנויה' : 'השעה נשמרה. גם ביומן', 'clock'))}
         onSwap=${() => onSwap(t)}
         onBack=${() => onBack(t)}
         onText=${(v) => setTask(t.id, { text: v })}

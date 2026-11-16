@@ -52,6 +52,8 @@ function freshState(scId) {
     posts: null, // the same for the content plan
     stepsDone: {}, // { taskId: [bool per step] }
     paidAll: false, // the +100 for all three is paid once a week
+    mentoring: sc.mentoring ?? null, // 'account' / 'no-account' = the account knows; 'yes' / 'no' = asked once; null = not known yet
+    goalEdit: null, // this week's targets, when the user changed them
     blocks: true,
     reminders: { ritual: { day: 0, at: '08:00' }, wed: { day: 3, at: '12:00' }, thu: { day: 4, at: '16:00' } },
     closed: false,
@@ -98,7 +100,9 @@ function App({ view: shellView, onViewChange }) {
   const scBase = { ...SCENARIOS[s.scId], calendar: s.connected };
   const events = s.connected ? s.events ?? eventsOf({ ...scBase, meeting: scBase.meeting }) : [];
   const posts = s.posts ?? postsOf(scBase);
-  const meeting = events.find((e) => e.kind === 'mentor') || null;
+  // "פגישת המיקוד" only for users in a FlowBiz mentoring, and only when the meeting is this week.
+  const mentored = s.mentoring === 'account' || s.mentoring === 'yes';
+  const meeting = (mentored && events.find((e) => e.kind === 'mentor')) || null;
   const sc = { ...scBase, meeting: !!meeting };
   const parts = partsOf(sc, s);
   const FLOW = parts.flatMap((p) => p.screens);
@@ -107,7 +111,7 @@ function App({ view: shellView, onViewChange }) {
   const setPosts = (fn) => setS((x) => ({ ...x, posts: fn(x.posts ?? posts) }));
   const lastTasks = lastTasksOf(sc);
   const focus = sc.goal ? focusOf(s.closed && s.thuNums ? s.thuNums : s.nums, sc) : null;
-  const goal = weekGoalOf(focus); // the week's goal: on the focus screen, then on the home map
+  const goal = weekGoalOf(focus, s.goalEdit); // the week's goal: on the focus screen, then on the home map
 
   const carryTask = () => lastTasks.find((t) => !sRef.current.lastDone[t.id] && sRef.current.carry[t.id] !== false) || null;
   const withTasks = (x) => (x.tasks ? x : { ...x, tasks: defaultTasks(sc, focus, sc.first || x.closed ? null : carryTask()) });
@@ -223,7 +227,7 @@ function App({ view: shellView, onViewChange }) {
     if (id.startsWith('home') || id === 'next-sunday') {
       if (id === 'home-before') return (setS((x) => ({ ...x, drawn: false })), setScreen('home'));
       if (id === 'next-sunday') {
-        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0, homeDone: {}, stepsDone: {}, paidAll: false }));
+        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0, homeDone: {}, stepsDone: {}, paidAll: false, goalEdit: null }));
         return setScreen('opening');
       }
       setS((x) => {
@@ -311,12 +315,12 @@ function App({ view: shellView, onViewChange }) {
 
   const common = { s, set: setS, items };
   const body = {
-    opening: html`<${Opening} parts=${parts} s=${s} />`,
+    opening: html`<${Opening} parts=${parts} s=${s} set=${setS} />`,
     last: html`<${LastWeek} ...${common} tasks=${lastTasks} />`,
     week: html`<${WeekScreen} sc=${sc} events=${events} posts=${posts} setEvents=${setEvents} setPosts=${setPosts} notify=${notify} connected=${sc.calendar} onConnect=${() => (setS((x) => ({ ...x, connected: true })), notify('Google Calendar חובר. הכריש קרא את השבוע', 'calendar-check'))} />`,
     followups: html`<${Followups} list=${fups} s=${s} onSent=${sent} onUnsend=${unsend} setMsg=${(id, v) => setS((x) => ({ ...x, msgs: { ...x.msgs, [id]: v } }))} notify=${notify} items=${items} />`,
     numbers: html`<${Numbers} ...${common} />`,
-    focus: html`<${Focus} s=${s.closed && s.thuNums ? { ...s, nums: s.thuNums } : s} focus=${focus} goal=${goal} items=${items} />`,
+    focus: html`<${Focus} s=${s.closed && s.thuNums ? { ...s, nums: s.thuNums } : s} focus=${focus} goal=${goal} onGoal=${(v) => (setS((x) => ({ ...x, goalEdit: v })), notify(v ? 'יעד השבוע עודכן, לשבוע הזה בלבד' : 'חזרה ליעד הקבוע', 'flag'))} items=${items} />`,
     meeting: meeting && html`<${Meeting} meeting=${meeting} ...${common} soon=${meeting.day <= 2} />`,
     tasks: s.tasks && html`<${Tasks} ...${common} sc=${sc} tasks=${placed} load=${load} focus=${shownFocus} onSwap=${swap} onBack=${unswap} notify=${notify} />`,
     done: s.tasks && html`<${Done} s=${s} set=${setS} sc=${sc} tasks=${placed} items=${items} focus=${shownFocus} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} setRem=${(k, v) => setS((x) => ({ ...x, reminders: { ...x.reminders, [k]: { ...x.reminders[k], ...v } } }))} />`,

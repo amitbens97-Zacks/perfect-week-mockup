@@ -85,9 +85,21 @@ export function nextOption(task) {
 // ---------- the time blocks ----------
 // Each task goes into the first free gap of its day, from 09:00, in 15-minute steps.
 // A full day pushes it to the next working day. Saturday is never used.
+// A task whose time the user set (t.fixAt) stays there, and is only flagged if it clashes with
+// something; the others go into the first free gap around them.
 export function placeBlocks(tasks, events) {
   const taken = events.map((e) => ({ day: e.day, a: toMin(e.from), b: toMin(e.to) }));
+  const fixed = {};
+  tasks.forEach((t) => {
+    if (!t.fixAt) return;
+    const a = toMin(t.fixAt);
+    const b = a + t.mins;
+    const clash = taken.some((x) => x.day === t.day && a < x.b && b > x.a);
+    taken.push({ day: t.day, a, b });
+    fixed[t.id] = { ...t, at: t.fixAt, until: toTime(b), moved: false, clash };
+  });
   return tasks.map((t) => {
+    if (fixed[t.id]) return fixed[t.id];
     for (let k = 0; k < 6; k += 1) {
       const day = (t.day + k) % 6;
       const end = day === 5 ? WORK.fridayEnd : WORK.end;

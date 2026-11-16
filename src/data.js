@@ -224,12 +224,12 @@ export const HISTORY = [
 
 // The demo situations (developer panel). Each part with no data is skipped quietly.
 export const SCENARIOS = {
-  full: { label: 'פעילה, אחרי שלב 11', sub: 'יומן, לידים, יעד, תוכן ופגישה ביומן', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: true, first: false, busy: false, streak: 3, hoursWeek: 20 },
-  nomeet: { label: 'בלי פגישה השבוע', sub: 'החלק "לפגישה" מדלג', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: false, first: false, busy: false, streak: 3, hoursWeek: 20 },
-  busy: { label: 'שבוע עמוס מדי', sub: 'בדיקת העומס מתריעה', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: true, first: false, busy: true, streak: 3, hoursWeek: 20 },
-  first: { label: 'שבוע ראשון', sub: 'בלי "מה נעשה"', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: false, first: true, busy: false, streak: 0, hoursWeek: 20 },
-  nocal: { label: 'בלי יומן מחובר', sub: 'יש כפתור לחבר, הלוח לא נתקע', step: 12, calendar: false, leads: true, goal: true, content: true, meeting: false, first: false, busy: false, streak: 3, hoursWeek: 20 },
-  mid: { label: 'באמצע המסע (שלב 4)', sub: 'בלי לידים, יעד ותוכן', step: 4, calendar: false, leads: false, goal: false, content: false, meeting: false, first: false, busy: false, streak: 1, hoursWeek: 10 },
+  full: { label: 'פעילה, אחרי שלב 11', sub: 'יומן, לידים, יעד, תוכן ופגישה ביומן', mentoring: 'account', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: true, first: false, busy: false, streak: 3, hoursWeek: 20 },
+  nomeet: { label: 'בלי פגישה השבוע', sub: 'החלק "לפגישה" מדלג', mentoring: 'account', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: false, first: false, busy: false, streak: 3, hoursWeek: 20 },
+  busy: { label: 'שבוע עמוס מדי', sub: 'בדיקת העומס מתריעה', mentoring: 'account', step: 12, calendar: true, leads: true, goal: true, content: true, meeting: true, first: false, busy: true, streak: 3, hoursWeek: 20 },
+  first: { label: 'שבוע ראשון', sub: 'בלי "מה נעשה", ושאלה אם בליווי', mentoring: null, step: 12, calendar: true, leads: true, goal: true, content: true, meeting: true, first: true, busy: false, streak: 0, hoursWeek: 20 },
+  nocal: { label: 'בלי יומן מחובר', sub: 'יש כפתור לחבר, הלוח לא נתקע', mentoring: 'account', step: 12, calendar: false, leads: true, goal: true, content: true, meeting: false, first: false, busy: false, streak: 3, hoursWeek: 20 },
+  mid: { label: 'באמצע המסע (שלב 4)', sub: 'בלי לידים, יעד ותוכן', mentoring: 'no-account', step: 4, calendar: false, leads: false, goal: false, content: false, meeting: false, first: false, busy: false, streak: 1, hoursWeek: 10 },
 };
 
 // "חסכת עד עכשיו": what the ritual is worth, the same way every step is worth something.
