@@ -1,7 +1,7 @@
 // The week board: seven days that fill in as the ritual goes ("מצייר" the week).
 // Wide screens: a board beside the question. Phones: a strip of seven days on top, and the
 // full board as a list in a sheet.
-import { html, useState, Icon, cx, PencilLine } from './lib.js';
+import { html, useState, useRef, Icon, cx, PencilLine } from './lib.js';
 import { DAYS, TODAY, WEEK_LABEL, USER, g } from './data.js';
 import { Sheet } from './ui.js';
 
@@ -45,7 +45,49 @@ function Chip({ it, i, small }) {
 }
 
 // items: [{ id, day, at, label, type, late, hi }]
-export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, class: cls = '' }) {
+// onMove: drag a card to another day, as in "מה כבר קבוע השבוע" (the follow-ups stay where the leads
+// table puts them). onPick: a tap on a task the user added opens its editor.
+export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, onMove, class: cls = '' }) {
+  const [drag, setDrag] = useState(null); // { id, x, y, over }
+  const st = useRef(null);
+  const swallow = useRef(false);
+  const canMove = (it) => onMove && it.type !== 'followup';
+  const dayAt = (x, y) => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-bday]');
+    return el ? Number(el.dataset.bday) : null;
+  };
+  const handlers = (it) =>
+    !canMove(it)
+      ? {}
+      : {
+          onPointerDown: (e) => {
+            if (e.button > 0) return;
+            st.current = { it, x0: e.clientX, y0: e.clientY, moved: false };
+            try {
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+            } catch {}
+          },
+          onPointerMove: (e) => {
+            const d = st.current;
+            if (!d) return;
+            if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+            d.moved = true;
+            e.preventDefault();
+            setDrag({ id: it.id, x: e.clientX, y: e.clientY, over: dayAt(e.clientX, e.clientY) });
+          },
+          onPointerUp: (e) => {
+            const d = st.current;
+            st.current = null;
+            if (!d || !d.moved) return;
+            swallow.current = true;
+            setTimeout(() => (swallow.current = false), 50);
+            const over = dayAt(e.clientX, e.clientY);
+            setDrag(null);
+            if (over != null && over !== it.day) onMove(it, over);
+          },
+          onPointerCancel: () => ((st.current = null), setDrag(null)),
+        };
+  const lifted = drag && items.find((x) => x.id === drag.id);
   const types = [...new Set(items.map((x) => legendKey(x.type)))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   return html`<div class=${cx('flex min-h-0 flex-col', !bare && 'paper rounded-[18px] p-3 md:p-4', cls)}>
     ${!bare &&
@@ -66,23 +108,37 @@ export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, c
     <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,.7fr)_minmax(0,.55fr)] gap-1">
       ${DAYS.map((d) => {
         const list = items.filter((x) => x.day === d.id).sort(sortItems);
-        return html`<div key=${d.id} class=${cx('flex min-h-0 min-w-0 flex-col rounded-xl p-1', d.id === TODAY ? 'bg-brand-50 ring-1 ring-brand-200' : d.id === 6 ? 'bg-canvas/70' : 'bg-canvas/40')}>
+        const over = lifted && drag.over === d.id && lifted.day !== d.id;
+        return html`<div key=${d.id} data-bday=${d.id} class=${cx('flex min-h-0 min-w-0 flex-col rounded-xl p-1 transition-colors', over ? 'bg-brand-50 ring-2 ring-brand-600' : d.id === TODAY ? 'bg-brand-50 ring-1 ring-brand-200' : d.id === 6 ? 'bg-canvas/70' : 'bg-canvas/40')}>
           <div class="mb-1 text-center leading-tight">
             <b class=${cx('block font-display text-[13px]', d.id === TODAY ? 'text-brand-600' : 'text-ink')}>${d.short}</b>
             <span class="text-[11px] tabular-nums text-muted">${d.date}</span>
           </div>
           <div class="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-            ${list.map((it, i) =>
-              onPick && it.type === 'mine'
-                ? html`<button key=${it.id} type="button" onClick=${() => onPick(it)} title="לערוך או למחוק" class="block w-full text-start cursor-pointer hover:opacity-80"><${Chip} it=${it} i=${i} small /></button>`
-                : html`<${Chip} key=${it.id} it=${it} i=${i} small />`
-            )}
+            ${list.map((it, i) => {
+              const pick = onPick && it.type === 'mine' ? () => !swallow.current && onPick(it) : null;
+              return html`<div
+                key=${it.id}
+                ...${handlers(it)}
+                onClick=${pick}
+                onKeyDown=${pick && ((e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), pick()))}
+                role=${pick ? 'button' : undefined}
+                tabIndex=${pick ? 0 : undefined}
+                data-card=${canMove(it) ? '' : undefined}
+                title=${pick ? 'לערוך או למחוק. אפשר גם לגרור' : canMove(it) ? 'לגרור ליום אחר' : undefined}
+                class=${cx(canMove(it) && 'touch-none select-none cursor-grab active:cursor-grabbing', pick && 'cursor-pointer hover:opacity-80', drag?.id === it.id && 'opacity-40')}
+              ><${Chip} it=${it} i=${i} small /></div>`;
+            })}
             ${list.length === 0 && d.id === 6 && html`<span class="mt-2 text-center text-[11px] text-faint">מנוחה</span>`}
             ${onAdd && html`<button type="button" onClick=${() => onAdd(d.id)} aria-label=${`להוסיף משימה ליומן ביום ${d.name}`} title="להוסיף משימה ליומן" class="inline-flex h-7 shrink-0 items-center justify-center gap-0.5 overflow-hidden whitespace-nowrap rounded-lg text-[12px] font-bold text-brand-600 opacity-60 hover:bg-white hover:opacity-100 cursor-pointer"><${Icon} name="plus" size=${13} /><span class="hidden xl:inline">משימה</span></button>`}
           </div>
         </div>`;
       })}
     </div>
+    ${lifted &&
+    html`<div class=${cx('pointer-events-none fixed z-[60] w-[140px] rotate-[2deg] rounded-lg px-2 py-1 text-[12px] leading-tight shadow-xl', (TYPE[lifted.type] || TYPE.client).cls)} style=${{ left: `${drag.x - 70}px`, top: `${drag.y - 18}px` }}>
+      ${lifted.at && html`<b class="block tabular-nums">${lifted.at}</b>`}<span class="block truncate">${lifted.short || lifted.label}</span>
+    </div>`}
     ${empty && items.length === 0
       ? html`<p class="mt-2 text-center text-[13px] text-muted">כאן השבוע יצטייר, חלק אחרי חלק</p>`
       : html`<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted">

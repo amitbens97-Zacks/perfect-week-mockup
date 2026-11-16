@@ -7,7 +7,7 @@
 import { html, render, useState, useEffect, useRef, Icon, confetti, confettiBurst } from './lib.js';
 import { PartnerBubble, Progress, TopBar, BottomBar, Status, PrimaryButton, Button, Toast } from './components.js';
 import { EXPLAIN, ExplainButton, SharkTalk } from './explain.js';
-import { STEP, USER, SCENARIOS, LAST_NUMS, FOLLOWUPS, VALUE, g } from './data.js';
+import { STEP, USER, DAYS, SCENARIOS, LAST_NUMS, FOLLOWUPS, VALUE, g } from './data.js';
 import { eventsOf, followupsOf, postsOf, lastTasksOf, focusOf, defaultTasks, nextOption, placeBlocks, loadOf } from './calc.js';
 import { Opening, LastWeek, Followups, Numbers, Focus, Meeting, Tasks, Done } from './screens.js';
 import { WeekScreen } from './calendar.js';
@@ -110,6 +110,19 @@ function App({ view: shellView, onViewChange }) {
   const fups = followupsOf(sc);
   const setEvents = (fn) => setS((x) => ({ ...x, events: fn(x.events ?? events) }));
   const setPosts = (fn) => setS((x) => ({ ...x, posts: fn(x.posts ?? posts) }));
+  // A card dragged to another day on the home board: a task, a calendar event, a post or a task
+  // the user added. The follow-ups don't move (the leads table sets their day).
+  const moveItem = (it, day) => {
+    const apply = (to) => {
+      if (it.type === 'task') setS((x) => ({ ...x, tasks: (x.tasks || []).map((t) => (`t${t.id}` === it.id ? { ...t, day: to } : t)) }));
+      else if (it.type === 'mine') setS((x) => ({ ...x, mine: (x.mine || []).map((m) => (m.id === it.mid ? { ...m, day: to } : m)) }));
+      else if (it.type === 'post') setPosts((l) => l.map((p) => (p.id === it.id ? { ...p, day: to } : p)));
+      else setEvents((l) => l.map((e) => (e.id === it.id ? { ...e, day: to } : e)));
+    };
+    const from = it.day;
+    apply(day);
+    notify(`עבר ליום ${DAYS[day].name}. ${it.type === 'post' ? 'עודכן גם במכונת התוכן' : s.connected ? 'עודכן גם ב-Google Calendar' : 'עודכן בלוח'}`, 'calendar-check', () => apply(from));
+  };
   const lastTasks = lastTasksOf(sc);
   const focus = sc.goal ? focusOf(s.closed && s.thuNums ? s.thuNums : s.nums, sc) : null;
   const goal = weekGoalOf(focus, s.goalEdit); // the week's goal: on the focus screen, then on the home map
@@ -276,7 +289,7 @@ function App({ view: shellView, onViewChange }) {
 
   if (screen === 'home')
     return html`<${Home} s=${s} set=${setS} tasks=${placed} items=${items} focus=${shownFocus} goal=${goal} drawn=${s.drawn} mode=${mode} setMode=${setMode}
-        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} />
+        onDraw=${() => (setS((x) => ({ ...x, tasks: x.drawn ? x.tasks : null, reached: 0 })), setScreen('opening'))} notify=${notify} onStep=${toggleStep} onTask=${toggleTask} onLink=${openLink} onMove=${moveItem} />
       <${Toast} toast=${toast} onUndo=${undoToast} />
       <${DevPanel} open=${dev} onClose=${() => setDev(false)} onJump=${jump} onReset=${reset} scenario=${s.scId} onScenario=${changeScenario} />
       ${devFab(setDev)}`;

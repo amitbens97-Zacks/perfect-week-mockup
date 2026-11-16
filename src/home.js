@@ -13,7 +13,7 @@ const NAV = ['בית', 'יומן', 'משימות', 'כספים', 'קבצים', '
 // "השבוע שלי" on the home page, the whole width: the goal and the focus on top, the three tasks
 // with their small steps on one side, and the week board (all seven days) on the other.
 // (The journey map lives on the system's own home page, so it is not repeated here.)
-function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard, onAdd, onPick }) {
+function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard, onAdd, onPick, onMove }) {
   // One task open at a time: the one the user picked, else the first one not done yet.
   const [pick, setPick] = useState(null);
   const link = 'text-[14px] font-bold text-brand-600 hover:underline cursor-pointer';
@@ -69,8 +69,9 @@ function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask,
           <button type="button" onClick=${onHistory} class=${link}>השבועות הקודמים</button>
         </div>
       </div>
-      <div class="hidden min-h-[440px] min-w-0 lg:flex">
-        <${WeekBoard} items=${items} bare onAdd=${onAdd} onPick=${onPick} class="w-full" />
+      <div class="hidden min-h-[440px] min-w-0 lg:flex lg:flex-col">
+        <p class="mb-1.5 flex items-center gap-1.5 text-[13px] text-muted"><${Icon} name="move" size=${14} />גוררים ליום אחר, והיומן מתעדכן</p>
+        <${WeekBoard} items=${items} bare onAdd=${onAdd} onPick=${onPick} onMove=${onMove} class="w-full flex-1" />
       </div>
     </div>
   </section>`;
@@ -111,7 +112,7 @@ function Notice({ icon, title, text, action, onClick }) {
   </button>`;
 }
 
-export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
+export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink, onMove }) {
   const [board, setBoard] = useState(false);
   const [mine, setMine] = useState(null); // { item, isNew }: a task of the user's own, in the editor
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
@@ -151,7 +152,7 @@ export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, 
         ${mode === 'thu' && drawn && html`<${Notice} icon="flag" title="יום חמישי · סוגרים את השבוע" text="30 שניות: מה בוצע והמספרים. ביום ראשון מתחילים ישר מהתכנון." action="לסגור" onClick=${() => setMode('thu-open')} />`}
         <h1 class="fb-h1 mb-1 text-[28px] md:text-[34px]">${g('בוקר טוב', 'בוקר טוב')}, <span class="fb-marker">${USER.firstName}</span></h1>
         <p class="mb-6 text-[16px] text-muted">${USER.business} · ${mode === 'wed' || mode === 'wed-open' ? 'רביעי 18.11' : mode === 'thu' || mode === 'thu-open' ? 'חמישי 19.11' : 'ראשון 15.11'}</p>
-        <${WeekCard} s=${s} tasks=${tasks} items=${items} focus=${focus} goal=${goal} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} onAdd=${addOn} onPick=${pickMine} />
+        <${WeekCard} s=${s} tasks=${tasks} items=${items} focus=${focus} goal=${goal} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} onAdd=${addOn} onPick=${pickMine} onMove=${onMove} />
       </div>
     </main>
     ${mine && html`<${Sheet} title=${mine.isNew ? 'משימה חדשה ביומן' : 'משימה ביומן'} onClose=${() => setMine(null)}><${MineEditor} item=${mine.item} isNew=${mine.isNew} onSave=${saveMine} onCancel=${() => setMine(null)} onDelete=${delMine} /><//>`}
