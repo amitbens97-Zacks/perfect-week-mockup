@@ -16,6 +16,7 @@ const EVENT_KINDS = [
   ['group', 'סדנה'],
   ['mentor', 'פגישת FlowBiz'],
   ['personal', 'אישי'],
+  ['mine', 'משימה'],
 ];
 const POST_STATES = ['מתוזמן', 'לצלם ולהעלות', 'טיוטה'];
 const selCls = 'h-10 rounded-lg border border-line bg-white px-2 text-[15px]';

@@ -5,7 +5,7 @@ import { Check, TaskRow } from './steps.js';
 import { Button, Logo, SharkAvatar } from './components.js';
 import { Sheet, inputCls } from './ui.js';
 import { DayList, WeekBoard } from './board.js';
-import { USER, DAYS, METRICS, HISTORY, VALUE, WEEK_LABEL, g } from './data.js';
+import { USER, DAYS, TODAY, METRICS, HISTORY, VALUE, WEEK_LABEL, g } from './data.js';
 import { fmt, num } from './calc.js';
 
 const NAV = ['בית', 'יומן', 'משימות', 'כספים', 'קבצים', 'לידים'];
@@ -13,7 +13,7 @@ const NAV = ['בית', 'יומן', 'משימות', 'כספים', 'קבצים', '
 // "השבוע שלי" on the home page, the whole width: the goal and the focus on top, the three tasks
 // with their small steps on one side, and the week board (all seven days) on the other.
 // (The journey map lives on the system's own home page, so it is not repeated here.)
-function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard }) {
+function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask, onLink, onHistory, onBoard, onAdd, onPick }) {
   // One task open at a time: the one the user picked, else the first one not done yet.
   const [pick, setPick] = useState(null);
   const link = 'text-[14px] font-bold text-brand-600 hover:underline cursor-pointer';
@@ -62,17 +62,44 @@ function WeekCard({ s, tasks, items, focus, goal, drawn, onDraw, onStep, onTask,
           ${tasks.map((t, i) => html`<${TaskRow} key=${t.id} t=${t} i=${i} sd=${s.stepsDone[t.id]} done=${!!s.homeDone[t.id]} open=${open === t.id} onOpen=${() => setPick(open === t.id ? 'none' : t.id)} onStep=${onStep} onTask=${onTask} onLink=${onLink} meta=${`${DAYS[t.day].short} ${t.at || ''}`} />`)}
         </div>
         ${goal && html`<p class="mt-3 flex items-start gap-1.5 rounded-xl bg-canvas px-3 py-2 text-[13px] ring-1 ring-line"><${Icon} name="flag" size=${14} class="mt-0.5 shrink-0 text-brand-600" /><span><b>היעדים:</b> ${goal.sub}</span></p>`}
-        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="button" onClick=${() => onAdd()} class="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[14px] font-bold text-brand-600 ring-1 ring-brand-200 hover:bg-brand-50 cursor-pointer"><${Icon} name="calendar-plus" size=${15} />משימה ליומן</button>
           <button type="button" onClick=${onBoard} class=${cx(link, 'lg:hidden')}>הלוח של השבוע</button>
           <button type="button" onClick=${onDraw} class=${link}>לעדכן את השבוע</button>
           <button type="button" onClick=${onHistory} class=${link}>השבועות הקודמים</button>
         </div>
       </div>
       <div class="hidden min-h-[440px] min-w-0 lg:flex">
-        <${WeekBoard} items=${items} bare class="w-full" />
+        <${WeekBoard} items=${items} bare onAdd=${onAdd} onPick=${onPick} class="w-full" />
       </div>
     </div>
   </section>`;
+}
+
+// A task of the user's own, straight into the calendar (beside the three of the ritual): what, which
+// day, from when to when. It goes to Google Calendar like the task blocks; a tap on it edits or deletes.
+function MineEditor({ item, isNew, onSave, onCancel, onDelete }) {
+  const [d, setD] = useState(item);
+  const put = (k) => (e) => setD((x) => ({ ...x, [k]: k === 'day' ? Number(e.target.value) : e.target.value }));
+  const bad = d.to <= d.from;
+  const ok = d.title.trim() && !bad;
+  const save = () => ok && onSave({ ...d, title: d.title.trim() });
+  const sel = 'h-10 rounded-lg border border-line bg-white px-2 text-[15px]';
+  return html`<div>
+    <input value=${d.title} onInput=${put('title')} onKeyDown=${(e) => e.key === 'Enter' && (e.preventDefault(), save())} placeholder="מה המשימה?" aria-label="המשימה" class=${cx(inputCls, 'mb-2.5')} autoFocus />
+    <div class="flex flex-wrap items-center gap-1.5">
+      <select value=${d.day} onChange=${put('day')} class=${sel} aria-label="יום">${DAYS.map((x) => html`<option value=${x.id}>${x.name} ${x.date}</option>`)}</select>
+      <input type="time" dir="ltr" step="900" value=${d.from} onInput=${put('from')} class=${cx(sel, 'tabular-nums')} aria-label="משעה" />
+      <span class="text-muted">עד</span>
+      <input type="time" dir="ltr" step="900" value=${d.to} onInput=${put('to')} class=${cx(sel, 'tabular-nums', bad && '!border-error')} aria-label="עד שעה" />
+    </div>
+    ${bad && html`<p class="mt-1 text-[13px] font-bold text-error">שעת הסיום לפני ההתחלה</p>`}
+    <div class="mt-4 flex items-center gap-2">
+      <${Button} variant="mini" onClick=${save} disabled=${!ok}><${Icon} name="check" size=${15} />${isNew ? 'להוסיף ליומן' : 'לשמור'}<//>
+      <${Button} variant="quiet" onClick=${onCancel}>ביטול<//>
+      ${!isNew && html`<button type="button" onClick=${onDelete} class="ms-auto inline-flex items-center gap-1 text-[14px] font-bold text-error hover:underline cursor-pointer"><${Icon} name="trash-2" size=${15} />למחוק</button>`}
+    </div>
+  </div>`;
 }
 
 // A notification as it appears at the top of the home page (and by email).
@@ -86,7 +113,30 @@ function Notice({ icon, title, text, action, onClick }) {
 
 export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, onDraw, notify, onStep, onTask, onLink }) {
   const [board, setBoard] = useState(false);
+  const [mine, setMine] = useState(null); // { item, isNew }: a task of the user's own, in the editor
   const done = tasks.filter((t) => s.homeDone[t.id]).length;
+  const where = s.connected ? 'ל-Google Calendar' : 'ללוח של השבוע';
+  const addOn = (day = TODAY) => setMine({ isNew: true, item: { id: '', day, from: '12:00', to: '13:00', title: '' } });
+  const pickMine = (it) => {
+    const m = (s.mine || []).find((x) => x.id === it.mid);
+    if (m) setMine({ item: m });
+  };
+  const saveMine = (x) => {
+    if (mine.isNew) {
+      set((y) => ({ ...y, mine: [...(y.mine || []), { ...x, id: `m${Date.now()}` }] }));
+      notify(`המשימה נוספה ${where}`, 'calendar-plus');
+    } else {
+      set((y) => ({ ...y, mine: y.mine.map((m) => (m.id === x.id ? x : m)) }));
+      notify('המשימה עודכנה, גם ביומן', 'check');
+    }
+    setMine(null);
+  };
+  const delMine = () => {
+    const x = mine.item;
+    set((y) => ({ ...y, mine: y.mine.filter((m) => m.id !== x.id) }));
+    setMine(null);
+    notify('המשימה נמחקה מהיומן', 'trash-2', () => set((y) => ({ ...y, mine: [...(y.mine || []), x] })));
+  };
   return html`<div class="fb-notebook flex h-dvh flex-col text-ink" dir="rtl">
     <header class="z-20 shrink-0 border-b border-line bg-surface">
       <div class="flex h-16 items-center gap-4 px-3 md:px-7">
@@ -101,9 +151,10 @@ export function Home({ s, set, tasks, items, focus, goal, drawn, mode, setMode, 
         ${mode === 'thu' && drawn && html`<${Notice} icon="flag" title="יום חמישי · סוגרים את השבוע" text="30 שניות: מה בוצע והמספרים. ביום ראשון מתחילים ישר מהתכנון." action="לסגור" onClick=${() => setMode('thu-open')} />`}
         <h1 class="fb-h1 mb-1 text-[28px] md:text-[34px]">${g('בוקר טוב', 'בוקר טוב')}, <span class="fb-marker">${USER.firstName}</span></h1>
         <p class="mb-6 text-[16px] text-muted">${USER.business} · ${mode === 'wed' || mode === 'wed-open' ? 'רביעי 18.11' : mode === 'thu' || mode === 'thu-open' ? 'חמישי 19.11' : 'ראשון 15.11'}</p>
-        <${WeekCard} s=${s} tasks=${tasks} items=${items} focus=${focus} goal=${goal} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} />
+        <${WeekCard} s=${s} tasks=${tasks} items=${items} focus=${focus} goal=${goal} drawn=${drawn} onDraw=${onDraw} onStep=${onStep} onTask=${onTask} onLink=${onLink} onHistory=${() => setMode('history')} onBoard=${() => setBoard(true)} onAdd=${addOn} onPick=${pickMine} />
       </div>
     </main>
+    ${mine && html`<${Sheet} title=${mine.isNew ? 'משימה חדשה ביומן' : 'משימה ביומן'} onClose=${() => setMine(null)}><${MineEditor} item=${mine.item} isNew=${mine.isNew} onSave=${saveMine} onCancel=${() => setMine(null)} onDelete=${delMine} /><//>`}
     ${board && html`<${Sheet} title=${`השבוע · ${WEEK_LABEL}`} onClose=${() => setBoard(false)}><${DayList} items=${items} focus=${focus} /><//>`}
     ${mode === 'wed-open' && html`<${WedSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('wed')} notify=${notify} />`}
     ${mode === 'thu-open' && html`<${ThuSheet} s=${s} set=${set} tasks=${tasks} onTask=${onTask} onClose=${() => setMode('thu')} notify=${notify} />`}

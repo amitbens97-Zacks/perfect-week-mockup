@@ -54,6 +54,7 @@ function freshState(scId) {
     paidAll: false, // the +100 for all three is paid once a week
     mentoring: sc.mentoring ?? null, // 'account' / 'no-account' = the account knows; 'yes' / 'no' = asked once; null = not known yet
     goalEdit: null, // this week's targets, when the user changed them
+    mine: [], // tasks the user added to the calendar from "השבוע שלי" on the home page
     blocks: true,
     reminders: { ritual: { day: 0, at: '08:00' }, wed: { day: 3, at: '12:00' }, thu: { day: 4, at: '16:00' } },
     closed: false,
@@ -227,7 +228,7 @@ function App({ view: shellView, onViewChange }) {
     if (id.startsWith('home') || id === 'next-sunday') {
       if (id === 'home-before') return (setS((x) => ({ ...x, drawn: false })), setScreen('home'));
       if (id === 'next-sunday') {
-        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0, homeDone: {}, stepsDone: {}, paidAll: false, goalEdit: null }));
+        setS((x) => ({ ...x, closed: true, thuNums: { leads: 7, calls: 3, closes: 1, revenue: 2700, marketing: '' }, tasks: null, drawn: false, reached: 0, homeDone: {}, stepsDone: {}, paidAll: false, goalEdit: null, mine: [] }));
         return setScreen('opening');
       }
       setS((x) => {
@@ -270,6 +271,7 @@ function App({ view: shellView, onViewChange }) {
   if (reached('followups') || (pos === 999 && fups.length))
     fups.forEach((f) => items.push({ id: `f${f.id}`, day: f.day, label: `לחזור ל${f.name.split(' ')[0]}`, type: 'followup', late: s.sent[f.id] ? 0 : f.late, icon: s.sent[f.id] ? 'check' : undefined }));
   if (screen === 'tasks' || pos === 999) placed.forEach((t) => items.push({ id: `t${t.id}`, day: t.day, at: t.at, label: t.text, type: 'task' }));
+  if (pos === 999) (s.mine || []).forEach((m) => items.push({ id: m.id, mid: m.id, day: m.day, at: m.from, label: m.title, type: 'mine' }));
   const shownFocus = (reached('focus') || pos === 999) && focus ? focus : null;
 
   if (screen === 'home')

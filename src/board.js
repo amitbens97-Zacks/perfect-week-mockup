@@ -14,8 +14,9 @@ export const TYPE = {
   followup: { icon: 'message-circle', cls: 'bg-warn-50 text-warn ring-1 ring-[#ecd3a8]', dot: 'bg-warn', label: 'פולואפים' },
   post: { icon: 'megaphone', cls: 'bg-brand-100 text-brand-700 ring-1 ring-brand-200', dot: 'bg-brand-300', label: 'תוכן' },
   task: { icon: 'pencil', cls: 'bg-brand-600 text-white shadow-sm', dot: 'bg-brand-600', label: 'המשימות' },
+  mine: { icon: 'clipboard-check', cls: 'bg-white text-brand-700 border border-dashed border-brand-300', dot: 'bg-white ring-1 ring-brand-600', label: 'משימות שהוספת' },
 };
-const ORDER = ['task', 'mentor', 'client', 'followup', 'post', 'personal'];
+const ORDER = ['task', 'mine', 'mentor', 'client', 'followup', 'post', 'personal'];
 const legendKey = (t) => (t === 'sales' || t === 'group' ? 'client' : t);
 const sortItems = (a, b) => (a.at || '99').localeCompare(b.at || '99');
 
@@ -44,7 +45,7 @@ function Chip({ it, i, small }) {
 }
 
 // items: [{ id, day, at, label, type, late, hi }]
-export function WeekBoard({ items, focus, empty, onClose, bare, class: cls = '' }) {
+export function WeekBoard({ items, focus, empty, onClose, bare, onAdd, onPick, class: cls = '' }) {
   const types = [...new Set(items.map((x) => legendKey(x.type)))].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
   return html`<div class=${cx('flex min-h-0 flex-col', !bare && 'paper rounded-[18px] p-3 md:p-4', cls)}>
     ${!bare &&
@@ -71,8 +72,13 @@ export function WeekBoard({ items, focus, empty, onClose, bare, class: cls = '' 
             <span class="text-[11px] tabular-nums text-muted">${d.date}</span>
           </div>
           <div class="thin-scroll flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-            ${list.map((it, i) => html`<${Chip} key=${it.id} it=${it} i=${i} small />`)}
+            ${list.map((it, i) =>
+              onPick && it.type === 'mine'
+                ? html`<button key=${it.id} type="button" onClick=${() => onPick(it)} title="לערוך או למחוק" class="block w-full text-start cursor-pointer hover:opacity-80"><${Chip} it=${it} i=${i} small /></button>`
+                : html`<${Chip} key=${it.id} it=${it} i=${i} small />`
+            )}
             ${list.length === 0 && d.id === 6 && html`<span class="mt-2 text-center text-[11px] text-faint">מנוחה</span>`}
+            ${onAdd && html`<button type="button" onClick=${() => onAdd(d.id)} aria-label=${`להוסיף משימה ליומן ביום ${d.name}`} title="להוסיף משימה ליומן" class="inline-flex h-7 shrink-0 items-center justify-center gap-0.5 overflow-hidden whitespace-nowrap rounded-lg text-[12px] font-bold text-brand-600 opacity-60 hover:bg-white hover:opacity-100 cursor-pointer"><${Icon} name="plus" size=${13} /><span class="hidden xl:inline">משימה</span></button>`}
           </div>
         </div>`;
       })}
